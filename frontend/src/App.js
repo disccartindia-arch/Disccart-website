@@ -15,6 +15,7 @@ import "@/index.css";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { Toaster } from "./components/ui/sonner";
+import { AnalyticsProvider } from "./lib/analytics";
 import Header from "./components/Header";
 import BottomNav from "./components/BottomNav";
 import Footer from "./components/Footer";
@@ -33,26 +34,28 @@ function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <div className="App min-h-screen bg-[#FAFAFA]">
-          <Header />
-          <main>
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              <Route path="/categories" element={<CategoriesPage />} />
-              <Route path="/category/:slug" element={<CategoryPage />} />
-              <Route path="/trending" element={<TrendingPage />} />
-              <Route path="/search" element={<SearchPage />} />
-              <Route path="/deals/:pageType" element={<SeoPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/admin" element={<AdminPage />} />
-            </Routes>
-          </main>
-          <Footer />
-          <BottomNav />
-          <Toaster position="top-center" richColors />
-        </div>
+        <AnalyticsProvider>
+          <div className="App min-h-screen bg-[#FAFAFA]">
+            <Header />
+            <main>
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/categories" element={<CategoriesPage />} />
+                <Route path="/category/:slug" element={<CategoryPage />} />
+                <Route path="/trending" element={<TrendingPage />} />
+                <Route path="/search" element={<SearchPage />} />
+                <Route path="/deals/:pageType" element={<SeoPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/admin" element={<AdminPage />} />
+              </Routes>
+            </main>
+            <Footer />
+            <BottomNav />
+            <Toaster position="top-center" richColors />
+          </div>
+        </AnalyticsProvider>
       </BrowserRouter>
     </AuthProvider>
   );

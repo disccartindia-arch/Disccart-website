@@ -77,7 +77,7 @@ Build DISCCART – AI Powered Coupon & Deals Platform with:
 - [x] Mobile responsive share buttons
 
 ## Test Credentials
-- Admin: admin@disccart.in / DisccartAdmin2024!
+- Admin: disccartindia@gmail.com / Admin@2026@
 
 ## Prioritized Backlog
 

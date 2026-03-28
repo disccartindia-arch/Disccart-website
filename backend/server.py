@@ -2,13 +2,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, UploadFile, File, Depends
+from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
 import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
-from typing import List, Optional
+from typing import List, Optional, Dict
 import uuid
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
@@ -17,12 +19,100 @@ import jwt
 import secrets
 import csv
 import io
+import time
+from collections import defaultdict
+import asyncio
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 ROOT_DIR = Path(__file__).parent
+
+# Rate limiting configuration
+RATE_LIMIT_REQUESTS = int(os.environ.get('RATE_LIMIT_REQUESTS', 100))
+RATE_LIMIT_WINDOW = int(os.environ.get('RATE_LIMIT_WINDOW', 60))
+
+# In-memory rate limiter (use Redis in production for distributed systems)
+class RateLimiter:
+    def __init__(self):
+        self.requests: Dict[str, list] = defaultdict(list)
+        self._cleanup_task = None
+    
+    def is_rate_limited(self, client_ip: str) -> bool:
+        now = time.time()
+        window_start = now - RATE_LIMIT_WINDOW
+        
+        # Clean old requests
+        self.requests[client_ip] = [t for t in self.requests[client_ip] if t > window_start]
+        
+        # Check if over limit
+        if len(self.requests[client_ip]) >= RATE_LIMIT_REQUESTS:
+            return True
+        
+        # Add current request
+        self.requests[client_ip].append(now)
+        return False
+    
+    def get_remaining(self, client_ip: str) -> int:
+        now = time.time()
+        window_start = now - RATE_LIMIT_WINDOW
+        self.requests[client_ip] = [t for t in self.requests[client_ip] if t > window_start]
+        return max(0, RATE_LIMIT_REQUESTS - len(self.requests[client_ip]))
+
+rate_limiter = RateLimiter()
+
+# Security Headers Middleware
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        
+        # Security headers
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        
+        # Cache control for static assets
+        if request.url.path.startswith("/static"):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        elif request.url.path in ["/robots.txt", "/sitemap.xml"]:
+            response.headers["Cache-Control"] = "public, max-age=86400"
+        elif request.url.path.startswith("/api"):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        
+        return response
+
+# Rate Limiting Middleware
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        # Skip rate limiting for health checks
+        if request.url.path in ["/api/health", "/api/"]:
+            return await call_next(request)
+        
+        client_ip = request.client.host if request.client else "unknown"
+        
+        if rate_limiter.is_rate_limited(client_ip):
+            return Response(
+                content='{"detail": "Too many requests. Please slow down."}',
+                status_code=429,
+                media_type="application/json",
+                headers={
+                    "Retry-After": str(RATE_LIMIT_WINDOW),
+                    "X-RateLimit-Limit": str(RATE_LIMIT_REQUESTS),
+                    "X-RateLimit-Remaining": "0"
+                }
+            )
+        
+        response = await call_next(request)
+        
+        # Add rate limit headers
+        remaining = rate_limiter.get_remaining(client_ip)
+        response.headers["X-RateLimit-Limit"] = str(RATE_LIMIT_REQUESTS)
+        response.headers["X-RateLimit-Remaining"] = str(remaining)
+        
+        return response
 
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
@@ -913,6 +1003,15 @@ async def get_seo_meta(page_type: str):
 # Include the router
 app.include_router(api_router)
 
+# Add GZip compression
+app.add_middleware(GZipMiddleware, minimum_size=500)
+
+# Add security headers
+app.add_middleware(SecurityHeadersMiddleware)
+
+# Add rate limiting
+app.add_middleware(RateLimitMiddleware)
+
 # CORS
 app.add_middleware(
     CORSMiddleware,
@@ -943,15 +1042,19 @@ async def startup_event():
     logger.info("DISCCART API started successfully")
 
 async def seed_admin():
-    admin_email = os.environ.get("ADMIN_EMAIL", "admin@disccart.in")
-    admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
+    admin_email = os.environ.get("ADMIN_EMAIL", "disccartindia@gmail.com")
+    admin_password = os.environ.get("ADMIN_PASSWORD", "Admin@2026@")
+    
+    # Delete any existing admin with old email
+    await db.users.delete_many({"role": "admin", "email": {"$ne": admin_email}})
+    
     existing = await db.users.find_one({"email": admin_email})
     if existing is None:
         hashed = hash_password(admin_password)
         await db.users.insert_one({
             "email": admin_email,
             "password_hash": hashed,
-            "name": "Admin",
+            "name": "DISCCART Admin",
             "role": "admin",
             "created_at": datetime.now(timezone.utc)
         })

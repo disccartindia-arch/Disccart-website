@@ -4,6 +4,7 @@ import { X, Copy, Check, ExternalLink, Clock, Sparkles } from 'lucide-react';
 import { trackClick } from '../lib/api';
 import { toast } from 'sonner';
 import { ShareButtonsFull } from './ShareButtons';
+import { trackCouponReveal, trackCouponCopy, trackAffiliateClick } from '../lib/analytics';
 
 export default function CouponRevealModal({ deal, isOpen, onClose }) {
   const [copied, setCopied] = useState(false);
@@ -14,6 +15,9 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
 
   const handleRedirect = useCallback(async () => {
     if (!deal) return;
+    
+    // Track affiliate click
+    trackAffiliateClick(deal.id, deal.brand_name, deal.affiliate_url);
     
     try {
       await trackClick(deal.id, 'web');
@@ -26,6 +30,9 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
 
   useEffect(() => {
     if (!isOpen || !hasCode) return;
+
+    // Track coupon reveal
+    trackCouponReveal(deal.id, deal.brand_name, deal.discount_value || 0);
 
     // Start countdown for redirect
     setCountdown(3);
@@ -43,7 +50,7 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isOpen, hasCode, handleRedirect]);
+  }, [isOpen, hasCode, handleRedirect, deal]);
 
   useEffect(() => {
     if (isOpen && !hasCode) {
@@ -55,6 +62,9 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
 
   const copyToClipboard = async () => {
     if (!deal?.code) return;
+    
+    // Track copy event
+    trackCouponCopy(deal.id, deal.brand_name, deal.code);
     
     try {
       await navigator.clipboard.writeText(deal.code);
