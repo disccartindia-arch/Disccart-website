@@ -17,6 +17,7 @@ import { AuthProvider } from "./context/AuthContext";
 import { Toaster } from "./components/ui/sonner";
 import Header from "./components/Header";
 import BottomNav from "./components/BottomNav";
+import Footer from "./components/Footer";
 import HomePage from "./pages/HomePage";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
@@ -48,6 +49,7 @@ function App() {
               <Route path="/admin" element={<AdminPage />} />
             </Routes>
           </main>
+          <Footer />
           <BottomNav />
           <Toaster position="top-center" richColors />
         </div>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { BadgeCheck, Copy, ExternalLink, Clock, Tag } from 'lucide-react';
 import { motion } from 'framer-motion';
 import CouponRevealModal from './CouponRevealModal';
+import { ShareButtonsCompact } from './ShareButtons';
 
 export default function DealCard({ deal }) {
   const [showModal, setShowModal] = useState(false);
@@ -121,6 +122,14 @@ export default function DealCard({ deal }) {
             </span>
           </div>
         )}
+
+        {/* Share Buttons */}
+        <div className="mt-3 pt-3 border-t border-gray-100">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-400 font-medium">Share this deal</span>
+            <ShareButtonsCompact deal={deal} />
+          </div>
+        </div>
       </motion.div>
 
       {/* Reveal Modal */}

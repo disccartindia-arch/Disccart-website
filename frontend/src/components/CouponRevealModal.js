@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, Copy, Check, ExternalLink, Clock, Sparkles } from 'lucide-react';
 import { trackClick } from '../lib/api';
 import { toast } from 'sonner';
+import { ShareButtonsFull } from './ShareButtons';
 
 export default function CouponRevealModal({ deal, isOpen, onClose }) {
   const [copied, setCopied] = useState(false);
@@ -188,6 +189,12 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
                 <p className="text-xs text-orange-700">
                   💡 <strong>Tip:</strong> Apply the code at checkout before payment to get your discount!
                 </p>
+              </div>
+
+              {/* Share Buttons */}
+              <div className="mt-6 pt-4 border-t border-gray-100">
+                <p className="text-center text-sm text-gray-500 mb-3">Share this deal with friends</p>
+                <ShareButtonsFull deal={deal} />
               </div>
             </div>
           </motion.div>
