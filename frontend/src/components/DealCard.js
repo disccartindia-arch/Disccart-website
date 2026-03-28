@@ -1,0 +1,134 @@
+import { useState } from 'react';
+import { BadgeCheck, Copy, ExternalLink, Clock, Tag } from 'lucide-react';
+import { motion } from 'framer-motion';
+import CouponRevealModal from './CouponRevealModal';
+
+export default function DealCard({ deal }) {
+  const [showModal, setShowModal] = useState(false);
+
+  const getDiscountDisplay = () => {
+    if (deal.discount_type === 'percentage' && deal.discount_value) {
+      return `${deal.discount_value}% OFF`;
+    } else if (deal.discount_type === 'flat' && deal.discount_value) {
+      return `₹${deal.discount_value} OFF`;
+    } else if (deal.discount_type === 'deal') {
+      return 'DEAL';
+    }
+    return 'OFFER';
+  };
+
+  const hasCode = deal.code && deal.code.trim() !== '';
+
+  return (
+    <>
+      <motion.div
+        className="deal-card bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col relative overflow-hidden group p-4"
+        whileHover={{ y: -4 }}
+        transition={{ duration: 0.2 }}
+        data-testid={`deal-card-${deal.id}`}
+      >
+        {/* Featured Badge */}
+        {deal.is_featured && (
+          <div className="absolute top-3 left-3 z-10 bg-[#FF8C00] text-white text-xs font-bold px-2 py-1 rounded-full">
+            FEATURED
+          </div>
+        )}
+
+        {/* Deal Image */}
+        <div className="relative aspect-[4/3] rounded-xl overflow-hidden mb-4 bg-gray-100">
+          {deal.image_url ? (
+            <img 
+              src={deal.image_url} 
+              alt={deal.title}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              loading="lazy"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-100 to-green-100">
+              <Tag className="w-12 h-12 text-[#FF8C00]" />
+            </div>
+          )}
+          
+          {/* Discount Badge */}
+          <div className="absolute top-2 right-2 bg-[#228B22] text-white font-black text-lg px-3 py-1 rounded-xl font-display shadow-lg">
+            {getDiscountDisplay()}
+          </div>
+        </div>
+
+        {/* Brand & Category */}
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xs font-bold text-[#FF8C00] uppercase tracking-wide">{deal.brand_name}</span>
+          <span className="text-gray-300">•</span>
+          <span className="text-xs text-gray-500">{deal.category_name}</span>
+        </div>
+
+        {/* Title */}
+        <h3 className="font-display font-semibold text-lg text-gray-900 mb-2 line-clamp-2 leading-tight">
+          {deal.title}
+        </h3>
+
+        {/* Description */}
+        {deal.description && (
+          <p className="text-sm text-gray-500 line-clamp-2 mb-3">
+            {deal.description}
+          </p>
+        )}
+
+        {/* Price Display */}
+        {deal.original_price && deal.discounted_price && (
+          <div className="flex items-center gap-2 mb-3">
+            <span className="font-display font-black text-xl text-[#228B22]">
+              ₹{deal.discounted_price.toLocaleString()}
+            </span>
+            <span className="text-sm text-gray-400 line-through">
+              ₹{deal.original_price.toLocaleString()}
+            </span>
+          </div>
+        )}
+
+        {/* Verified Badge */}
+        {deal.is_verified && (
+          <div className="flex items-center gap-1 text-[#228B22] text-xs font-medium mb-3">
+            <BadgeCheck className="w-4 h-4" />
+            <span>Verified</span>
+          </div>
+        )}
+
+        {/* CTA Button */}
+        <button
+          onClick={() => setShowModal(true)}
+          className="mt-auto relative overflow-hidden bg-gradient-to-r from-[#FF8C00] to-[#E67E00] text-white font-bold rounded-xl px-6 py-4 w-full group/btn flex items-center justify-center gap-2 transition-all hover:shadow-lg hover:shadow-orange-500/25 active:scale-98"
+          data-testid={`reveal-btn-${deal.id}`}
+        >
+          {hasCode ? (
+            <>
+              <Copy className="w-5 h-5" />
+              <span>Reveal Code</span>
+            </>
+          ) : (
+            <>
+              <ExternalLink className="w-5 h-5" />
+              <span>Get Deal</span>
+            </>
+          )}
+        </button>
+
+        {/* Clicks indicator */}
+        {deal.clicks > 0 && (
+          <div className="mt-2 text-center">
+            <span className="text-xs text-gray-400">
+              🔥 {deal.clicks.toLocaleString()} people used this
+            </span>
+          </div>
+        )}
+      </motion.div>
+
+      {/* Reveal Modal */}
+      <CouponRevealModal 
+        deal={deal} 
+        isOpen={showModal} 
+        onClose={() => setShowModal(false)} 
+      />
+    </>
+  );
+}
