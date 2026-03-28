@@ -337,10 +337,15 @@ async def refresh_token(request: Request, response: Response):
 @api_router.get("/categories", response_model=List[CategoryResponse])
 async def get_categories():
     categories = await db.categories.find({}, {"_id": 0, "id": {"$toString": "$_id"}, "name": 1, "slug": 1, "icon": 1, "image_url": 1, "description": 1}).to_list(100)
-    # Get deal counts
+    # Get deal counts using aggregation (optimized single query)
+    pipeline = [
+        {"$match": {"is_active": True}},
+        {"$group": {"_id": "$category_name", "count": {"$sum": 1}}}
+    ]
+    counts_cursor = await db.coupons.aggregate(pipeline).to_list(None)
+    counts = {c["_id"]: c["count"] for c in counts_cursor}
     for cat in categories:
-        count = await db.coupons.count_documents({"category_name": cat["name"], "is_active": True})
-        cat["deal_count"] = count
+        cat["deal_count"] = counts.get(cat["name"], 0)
     return categories
 
 @api_router.post("/categories", response_model=CategoryResponse)
@@ -358,9 +363,15 @@ async def create_category(data: CategoryCreate, request: Request):
 @api_router.get("/brands", response_model=List[BrandResponse])
 async def get_brands():
     brands = await db.brands.find({}, {"_id": 0, "id": {"$toString": "$_id"}, "name": 1, "slug": 1, "logo_url": 1, "website_url": 1, "description": 1}).to_list(100)
+    # Get deal counts using aggregation (optimized single query)
+    pipeline = [
+        {"$match": {"is_active": True}},
+        {"$group": {"_id": "$brand_name", "count": {"$sum": 1}}}
+    ]
+    counts_cursor = await db.coupons.aggregate(pipeline).to_list(None)
+    counts = {b["_id"]: b["count"] for b in counts_cursor}
     for brand in brands:
-        count = await db.coupons.count_documents({"brand_name": brand["name"], "is_active": True})
-        brand["deal_count"] = count
+        brand["deal_count"] = counts.get(brand["name"], 0)
     return brands
 
 @api_router.post("/brands", response_model=BrandResponse)
@@ -755,7 +766,7 @@ app.include_router(api_router)
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
-    allow_origins=[os.environ.get("FRONTEND_URL", "http://localhost:3000"), "http://localhost:3000"],
+    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )
