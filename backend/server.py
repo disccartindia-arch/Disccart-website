@@ -759,6 +759,157 @@ async def root():
 async def health():
     return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
 
+# ===================== SEO ENDPOINTS =====================
+
+SITE_URL = os.environ.get("SITE_URL", "https://disccart.in")
+
+@app.get("/robots.txt", response_class=Response)
+async def robots_txt():
+    """Generate robots.txt for search engine crawlers"""
+    content = f"""# DISCCART Robots.txt
+# https://disccart.in
+
+User-agent: *
+Allow: /
+Allow: /categories
+Allow: /trending
+Allow: /category/*
+Allow: /deals/*
+Allow: /search
+
+# Disallow admin and auth pages
+Disallow: /admin
+Disallow: /login
+Disallow: /register
+Disallow: /profile
+Disallow: /api/
+
+# Sitemap location
+Sitemap: {SITE_URL}/sitemap.xml
+
+# Crawl-delay for polite crawling
+Crawl-delay: 1
+"""
+    return Response(content=content, media_type="text/plain")
+
+@app.get("/sitemap.xml", response_class=Response)
+async def sitemap_xml():
+    """Generate dynamic XML sitemap"""
+    now = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    
+    # Static pages
+    static_pages = [
+        {"loc": "/", "priority": "1.0", "changefreq": "daily"},
+        {"loc": "/categories", "priority": "0.9", "changefreq": "daily"},
+        {"loc": "/trending", "priority": "0.9", "changefreq": "hourly"},
+    ]
+    
+    # Get categories for dynamic pages
+    categories = await db.categories.find({}, {"slug": 1}).to_list(100)
+    
+    # Get brands for SEO pages
+    brands = ["amazon", "flipkart", "myntra", "swiggy", "zomato", "nykaa", "ajio", "makemytrip"]
+    
+    # SEO keyword pages
+    seo_pages = [
+        "amazon-coupons", "myntra-sale-today", "flipkart-offers", 
+        "swiggy-coupons", "zomato-coupons", "electronics-deals",
+        "fashion-sale", "best-deals-under-1000", "food-delivery-coupons"
+    ]
+    
+    # Build XML
+    xml_content = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    xml_content += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"\n'
+    xml_content += '        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n'
+    
+    # Add static pages
+    for page in static_pages:
+        xml_content += f"""  <url>
+    <loc>{SITE_URL}{page["loc"]}</loc>
+    <lastmod>{now}</lastmod>
+    <changefreq>{page["changefreq"]}</changefreq>
+    <priority>{page["priority"]}</priority>
+  </url>\n"""
+    
+    # Add category pages
+    for cat in categories:
+        xml_content += f"""  <url>
+    <loc>{SITE_URL}/category/{cat["slug"]}</loc>
+    <lastmod>{now}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>\n"""
+    
+    # Add SEO pages
+    for seo_page in seo_pages:
+        xml_content += f"""  <url>
+    <loc>{SITE_URL}/deals/{seo_page}</loc>
+    <lastmod>{now}</lastmod>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>\n"""
+    
+    xml_content += '</urlset>'
+    
+    return Response(content=xml_content, media_type="application/xml")
+
+@api_router.get("/seo/meta/{page_type}")
+async def get_seo_meta(page_type: str):
+    """Get SEO meta data for different page types"""
+    
+    base_meta = {
+        "site_name": "DISCCART",
+        "locale": "en_IN",
+        "type": "website",
+        "twitter_card": "summary_large_image",
+        "twitter_site": "@disccart"
+    }
+    
+    meta_data = {
+        "home": {
+            "title": "DISCCART - Best Deals, Coupons & Promo Codes India 2026",
+            "description": "Find verified coupons, promo codes & exclusive deals from Amazon, Flipkart, Myntra & 500+ brands. Save up to 90% on your online shopping!",
+            "keywords": "coupons, promo codes, deals, discounts, offers, amazon coupons, flipkart offers, myntra sale, online shopping deals india",
+            "image": f"{SITE_URL}/og-image.png"
+        },
+        "categories": {
+            "title": "All Categories - Coupons & Deals | DISCCART",
+            "description": "Browse deals by category - Electronics, Fashion, Food, Travel, Beauty & more. Find the best coupons for every shopping need.",
+            "keywords": "shopping categories, electronics deals, fashion coupons, food delivery offers, travel discounts",
+            "image": f"{SITE_URL}/og-categories.png"
+        },
+        "trending": {
+            "title": "Trending Deals & Hot Offers Today | DISCCART",
+            "description": "Discover today's hottest deals and trending offers. Limited time discounts on top brands updated every hour.",
+            "keywords": "trending deals, hot offers, today deals, limited time offers, flash sale",
+            "image": f"{SITE_URL}/og-trending.png"
+        }
+    }
+    
+    # Dynamic brand pages
+    if page_type.startswith("brand-"):
+        brand = page_type.replace("brand-", "").replace("-", " ").title()
+        meta_data[page_type] = {
+            "title": f"{brand} Coupons, Promo Codes & Offers - January 2026 | DISCCART",
+            "description": f"Get the latest {brand} coupons, promo codes & exclusive deals. Save up to 80% with verified {brand} offers.",
+            "keywords": f"{brand.lower()} coupons, {brand.lower()} promo codes, {brand.lower()} offers, {brand.lower()} deals",
+            "image": f"{SITE_URL}/og-{page_type}.png"
+        }
+    
+    # Dynamic category pages
+    if page_type.startswith("category-"):
+        category = page_type.replace("category-", "").replace("-", " ").title()
+        meta_data[page_type] = {
+            "title": f"{category} Deals & Coupons - Best Offers | DISCCART",
+            "description": f"Find the best {category.lower()} deals, coupons & discounts. Save big on {category.lower()} shopping with verified promo codes.",
+            "keywords": f"{category.lower()} deals, {category.lower()} coupons, {category.lower()} offers, {category.lower()} discounts",
+            "image": f"{SITE_URL}/og-{page_type}.png"
+        }
+    
+    result = meta_data.get(page_type, meta_data["home"])
+    result.update(base_meta)
+    return result
+
 # Include the router
 app.include_router(api_router)
 

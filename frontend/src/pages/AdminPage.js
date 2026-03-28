@@ -23,6 +23,7 @@ import {
   getCoupons, createCoupon, updateCoupon, deleteCoupon,
   bulkUploadCoupons, getAnalyticsOverview, getCategories
 } from '../lib/api';
+import { AdminSEO } from '../components/SEO';
 
 export default function AdminPage() {
   const { user, isAuthenticated, isAdmin, loading: authLoading } = useAuth();
@@ -121,6 +122,7 @@ export default function AdminPage() {
 
   return (
     <div className="pb-20 md:pb-8" data-testid="admin-page">
+      <AdminSEO />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
         <div className="flex items-center justify-between mb-8">

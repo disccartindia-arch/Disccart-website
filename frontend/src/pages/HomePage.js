@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { getCoupons, getCategories } from '../lib/api';
 import DealCard from '../components/DealCard';
 import CategoryPills from '../components/CategoryPills';
+import { HomeSEO } from '../components/SEO';
 
 export default function HomePage() {
   const [featuredDeals, setFeaturedDeals] = useState([]);
@@ -43,6 +44,7 @@ export default function HomePage() {
 
   return (
     <div className="pb-20 md:pb-8" data-testid="home-page">
+      <HomeSEO />
       {/* Hero Section */}
       <section className="bg-gradient-to-br from-orange-50 to-green-50 py-8 md:py-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

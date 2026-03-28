@@ -4,6 +4,7 @@ import { getSeoPageData } from '../lib/api';
 import DealCard from '../components/DealCard';
 import { motion } from 'framer-motion';
 import { Tag, HelpCircle } from 'lucide-react';
+import { BrandPageSEO } from '../components/SEO';
 
 export default function SeoPage() {
   const { pageType } = useParams();
@@ -52,6 +53,7 @@ export default function SeoPage() {
 
   return (
     <div className="pb-20 md:pb-8" data-testid="seo-page">
+      <BrandPageSEO brand={pageType} dealCount={pageData?.coupons?.length || 0} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <motion.div

@@ -4,6 +4,7 @@ import { getCoupons } from '../lib/api';
 import DealCard from '../components/DealCard';
 import CategoryPills from '../components/CategoryPills';
 import { motion } from 'framer-motion';
+import { TrendingSEO } from '../components/SEO';
 
 export default function TrendingPage() {
   const [deals, setDeals] = useState([]);
@@ -25,6 +26,7 @@ export default function TrendingPage() {
 
   return (
     <div className="pb-20 md:pb-8" data-testid="trending-page">
+      <TrendingSEO />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Category Pills */}
         <CategoryPills />

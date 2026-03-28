@@ -4,6 +4,7 @@ import { getCoupons } from '../lib/api';
 import DealCard from '../components/DealCard';
 import CategoryPills from '../components/CategoryPills';
 import { motion } from 'framer-motion';
+import { CategoryPageSEO } from '../components/SEO';
 
 export default function CategoryPage() {
   const { slug } = useParams();
@@ -29,6 +30,7 @@ export default function CategoryPage() {
 
   return (
     <div className="pb-20 md:pb-8" data-testid="category-page">
+      <CategoryPageSEO category={slug} dealCount={deals.length} />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Category Pills */}
         <CategoryPills activeCategory={slug} />

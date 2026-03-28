@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
+import { LoginSEO } from '../components/SEO';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -38,6 +39,7 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-[calc(100vh-80px)] flex items-center justify-center px-4 py-12" data-testid="login-page">
+      <LoginSEO />
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
