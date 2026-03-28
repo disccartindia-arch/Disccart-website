@@ -419,7 +419,11 @@ async def get_coupons(
 
 @api_router.get("/coupons/{coupon_id}", response_model=CouponResponse)
 async def get_coupon(coupon_id: str):
-    coupon = await db.coupons.find_one({"_id": ObjectId(coupon_id)}, {"_id": 0})
+    try:
+        oid = ObjectId(coupon_id)
+    except Exception:
+        raise HTTPException(status_code=422, detail="Invalid coupon ID format")
+    coupon = await db.coupons.find_one({"_id": oid}, {"_id": 0})
     if not coupon:
         raise HTTPException(status_code=404, detail="Coupon not found")
     coupon["id"] = coupon_id

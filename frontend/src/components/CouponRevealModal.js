@@ -74,9 +74,14 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
     }
   };
 
-  const handleClose = () => {
+  const handleClose = (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     setRedirecting(false);
     setCopied(false);
+    setCountdown(3);
     onClose();
   };
 
