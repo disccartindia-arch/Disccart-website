@@ -1,107 +1,90 @@
-# DISCCART - AI Powered Coupon & Deals Platform
+# DISCCART - AI-Powered Coupon & Deals Platform
 
 ## Original Problem Statement
-Build DISCCART – AI Powered Coupon & Deals Platform with:
-- Deal discovery + savings engine
-- Goal: Beat BuyHatke in speed + UX, Beat GrabOn in SEO
-
-## MVP Scope (Phase 1)
-- Deal listing with categories
-- High-conversion coupon reveal UX
-- Admin panel + CSV upload
-- Basic SEO pages
+Build DISCCART – an AI-powered coupon and deals platform. Scalable startup platform with React + FastAPI + MongoDB. Core features: deal listing, high-conversion coupon reveal UX (auto-copy, countdown timer), admin panel, SEO pages, smart affiliate engine (pretty links).
 
 ## User Personas
-1. **Deal Hunter** - Looking for best discounts across categories
-2. **Brand Loyal** - Searches for specific brand coupons (Amazon, Myntra, etc.)
-3. **Admin** - Manages deals, uploads coupons, tracks analytics
+- **Shoppers**: Looking for verified coupons, promo codes, and deals across Indian e-commerce brands
+- **Admin**: Platform owner managing deals, categories, blog content, static pages, and affiliate links
+- **Affiliate Partners**: Brands whose deals are featured via pretty links
 
-## Core Requirements (Static)
-- Fast, mobile-first deal browsing
-- One-click coupon reveal with urgency (countdown, social proof)
-- Admin CRUD for deals
-- Category-based filtering
-- Search functionality
+## Core Requirements
+- Fast, modern UI (Tailwind + Shadcn), responsive design
+- Admin control panel for deal management
+- SEO optimization (meta tags, sitemaps, dynamic pages)
+- Google Analytics integration
+- CMS for blog, static pages, categories
+- Pretty Links URL shortener for affiliate tracking
 
-## Architecture
-- **Frontend**: React 19 + Tailwind CSS + Shadcn UI + Framer Motion
-- **Backend**: FastAPI + Motor (async MongoDB)
+## Tech Stack
+- **Frontend**: React.js, TailwindCSS, Shadcn UI, Framer Motion, React Helmet Async, React Markdown
+- **Backend**: FastAPI (Python), Motor (async MongoDB driver)
 - **Database**: MongoDB
-- **Auth**: JWT-based (cookies)
-- **AI**: OpenAI GPT-5.2 for content generation (configured)
+- **Auth**: JWT (httpOnly cookies, access + refresh tokens)
+- **AI**: OpenAI GPT-5.2 via Emergent LLM Key (deal content generation)
+- **Analytics**: Google Analytics 4 (G-Y5T6ECMHE2)
 
-## What's Been Implemented (2026-03-28)
-### Backend
-- [x] JWT authentication (login, register, logout, refresh)
-- [x] Admin seeding with role-based access
-- [x] Coupon CRUD endpoints
-- [x] Category/Brand management
-- [x] Click tracking & analytics
-- [x] CSV bulk upload
-- [x] SEO page data endpoints
-- [x] AI content generation endpoint (OpenAI)
-- [x] Brute force protection
-- [x] Deal scoring algorithm
+## What's Implemented (as of March 29, 2026)
 
-### Frontend
-- [x] Homepage with hero, featured deals, categories
-- [x] Category pills navigation
-- [x] Deal cards with discount badges
-- [x] Coupon reveal modal with:
-  - Countdown timer
-  - Auto-copy functionality
-  - Social proof ("93% saved money")
-  - Redirect to affiliate link
-- [x] Categories page
-- [x] Trending page
-- [x] Search page
-- [x] SEO pages (/deals/amazon-coupons, etc.)
-- [x] Login/Register pages
-- [x] Profile page
-- [x] Admin Panel with:
-  - Dashboard analytics
-  - Coupons table
-  - Add/Edit coupon form
-  - CSV bulk upload
-- [x] Mobile bottom navigation
-- [x] Responsive design
+### Phase 1 - MVP (DONE)
+- JWT Authentication with brute-force protection
+- Deal/Coupon CRUD with deal scoring
+- Categories and Brands
+- Coupon Reveal Modal with auto-copy
+- Social Media Share Buttons (WhatsApp, Telegram, Instagram)
+- Homepage with featured deals, category pills
+- Search, Category, Trending pages
 
-### Social Media Integration (2026-03-28)
-- [x] WhatsApp share button with pre-filled message
-- [x] Telegram share button with pre-filled message
-- [x] Instagram profile link button
-- [x] Copy Link button with toast notification
-- [x] Share buttons on all deal cards
-- [x] Share buttons in coupon reveal modal
-- [x] Footer with social media links
-- [x] Mobile responsive share buttons
+### Phase 2 - SEO & Analytics (DONE)
+- XML Sitemap generation
+- Robots.txt
+- Dynamic meta tags via React Helmet Async
+- Google Analytics 4 integration
+- SEO-optimized pages for brands/categories
+- Security Headers & Rate Limiting
 
-## Test Credentials
-- Admin: disccartindia@gmail.com / Admin@2026@
+### Phase 3 - CMS & Admin Overhaul (DONE)
+- Admin Panel with 7 tabs: Dashboard, Deals, Categories, Pretty Links, Pages, Blog, CSV Upload
+- Pretty Links URL shortener with click tracking
+- Static Pages CMS (Privacy Policy, Terms & Conditions, About Us, Contact Us)
+- Blog system with Markdown content, categories, view tracking
+- Footer with links to all static pages
+- Deals page and Limited Time Deals page with countdown timers
+- CSV bulk upload for coupons
+- AI content generation for deals
 
-## Prioritized Backlog
+## Database Collections
+- `users`: {email, password_hash, name, role, created_at}
+- `coupons`: {title, description, code, discount_type, discount_value, brand_name, category_name, affiliate_url, image_url, expires_at, is_featured, is_verified, is_active, tags, clicks, deal_score, created_at}
+- `categories`: {name, slug, icon, image_url, description}
+- `pages`: {slug, title, content, meta_description, meta_keywords, is_published, created_at, updated_at}
+- `blog_posts`: {slug, title, excerpt, content, featured_image, category, tags, meta_description, is_published, views, created_at, updated_at}
+- `pretty_links`: {slug, destination_url, title, description, is_active, clicks, created_at, last_clicked}
+- `clicks`: {coupon_id, source, ip, user_agent, created_at}
+- `link_clicks`: {link_id, slug, ip, user_agent, referer, created_at}
 
-### P0 (Critical for Launch)
-- [x] WhatsApp/Telegram share buttons ✅ DONE
-- [ ] User wishlist functionality
-- [ ] Email notification system
-- [ ] Coupon expiry detection
+## API Endpoints
+### Auth: POST /api/auth/login, /register, /logout, /refresh | GET /api/auth/me
+### Coupons: GET/POST /api/coupons | GET/PUT/DELETE /api/coupons/:id | POST /api/coupons/bulk-upload
+### Categories: GET/POST /api/categories | GET/PUT/DELETE /api/categories/:id
+### Pages: GET /api/pages | GET /api/pages/:slug | POST/PUT/DELETE (admin)
+### Blog: GET /api/blog | GET /api/blog/:slug | POST/PUT/DELETE (admin)
+### Pretty Links: GET/POST /api/pretty-links | PUT/DELETE /api/pretty-links/:id | GET /api/go/:slug (redirect)
+### Analytics: GET /api/analytics/overview | GET /api/analytics/clicks
+### SEO: GET /api/seo/:page_type | GET /api/seo/meta/:page_type
+### AI: POST /api/ai/generate-content
 
-### P1 (Important)
-- [ ] Push notifications (Firebase)
-- [ ] "Best time to buy" hints
-- [ ] Fake coupon detection
-- [ ] Better affiliate tracking
+## Backlog (Prioritized)
+### P1
+- Facebook Pixel tracking (actual implementation, currently placeholder)
 
-### P2 (Nice to Have)
-- [ ] Deal Score AI ranking
-- [ ] Price history charts
-- [ ] User reviews/ratings
-- [ ] Referral system
+### P2
+- User wishlist system
+- "Deal Score" AI-based ranking & Fake coupon detection
+- Email capture popup for deal alerts
+- Push notifications (Firebase)
+- "Best time to buy" hints
 
-## Next Tasks
-1. Add WhatsApp/Telegram viral sharing buttons
-2. Implement user wishlist system
-3. Add email capture popup for notifications
-4. Enhance SEO with more dynamic pages
-5. Add sitemap generation
+## Admin Credentials
+- Email: disccartindia@gmail.com
+- Password: Admin@2026@
