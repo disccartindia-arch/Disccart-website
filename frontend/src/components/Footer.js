@@ -87,10 +87,10 @@ export default function Footer() {
           <div>
             <h3 className="font-display font-bold text-lg mb-4">Quick Links</h3>
             <ul className="space-y-2">
+              <li><a href="/deals" className="text-gray-400 hover:text-white transition-colors">All Deals</a></li>
               <li><a href="/categories" className="text-gray-400 hover:text-white transition-colors">Categories</a></li>
-              <li><a href="/trending" className="text-gray-400 hover:text-white transition-colors">Trending Deals</a></li>
-              <li><a href="/deals/amazon-coupons" className="text-gray-400 hover:text-white transition-colors">Amazon Coupons</a></li>
-              <li><a href="/deals/myntra-sale-today" className="text-gray-400 hover:text-white transition-colors">Myntra Sale</a></li>
+              <li><a href="/deals/limited-time" className="text-gray-400 hover:text-white transition-colors">Limited Time Offers</a></li>
+              <li><a href="/blog" className="text-gray-400 hover:text-white transition-colors">Blog</a></li>
             </ul>
           </div>
 
@@ -98,24 +98,29 @@ export default function Footer() {
           <div>
             <h3 className="font-display font-bold text-lg mb-4">Top Brands</h3>
             <ul className="space-y-2">
+              <li><a href="/deals/amazon-coupons" className="text-gray-400 hover:text-white transition-colors">Amazon</a></li>
               <li><a href="/deals/flipkart-offers" className="text-gray-400 hover:text-white transition-colors">Flipkart</a></li>
+              <li><a href="/deals/myntra-sale-today" className="text-gray-400 hover:text-white transition-colors">Myntra</a></li>
               <li><a href="/deals/swiggy-coupons" className="text-gray-400 hover:text-white transition-colors">Swiggy</a></li>
-              <li><a href="/deals/zomato-coupons" className="text-gray-400 hover:text-white transition-colors">Zomato</a></li>
-              <li><a href="/deals/nykaa-coupons" className="text-gray-400 hover:text-white transition-colors">Nykaa</a></li>
             </ul>
+          </div>
+        </div>
+
+        {/* Footer Pages Links */}
+        <div className="mt-8 pt-8 border-t border-gray-800">
+          <div className="flex flex-wrap justify-center gap-6 text-sm">
+            <a href="/page/about-us" className="text-gray-400 hover:text-white transition-colors">About Us</a>
+            <a href="/page/contact-us" className="text-gray-400 hover:text-white transition-colors">Contact Us</a>
+            <a href="/page/privacy-policy" className="text-gray-400 hover:text-white transition-colors">Privacy Policy</a>
+            <a href="/page/terms-and-conditions" className="text-gray-400 hover:text-white transition-colors">Terms & Conditions</a>
           </div>
         </div>
 
         {/* Bottom Bar */}
         <div className="mt-12 pt-8 border-t border-gray-800 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-gray-500 text-sm">
-            © {currentYear} DISCCART. All rights reserved.
+            &copy; {currentYear} DISCCART. All rights reserved.
           </p>
-          <div className="flex gap-6 text-sm">
-            <a href="#" className="text-gray-500 hover:text-white transition-colors">Privacy Policy</a>
-            <a href="#" className="text-gray-500 hover:text-white transition-colors">Terms of Service</a>
-            <a href="#" className="text-gray-500 hover:text-white transition-colors">Contact Us</a>
-          </div>
         </div>
       </div>
     </footer>

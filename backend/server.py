@@ -323,6 +323,105 @@ class AIContentResponse(BaseModel):
     whatsapp_message: str
     telegram_post: str
 
+# Pretty Link Models
+class PrettyLinkCreate(BaseModel):
+    slug: str  # e.g., "amazon-deal"
+    destination_url: str
+    title: Optional[str] = None
+    description: Optional[str] = None
+    is_active: bool = True
+
+class PrettyLinkUpdate(BaseModel):
+    slug: Optional[str] = None
+    destination_url: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class PrettyLinkResponse(BaseModel):
+    id: str
+    slug: str
+    destination_url: str
+    title: Optional[str] = None
+    description: Optional[str] = None
+    short_url: str
+    clicks: int = 0
+    is_active: bool = True
+    created_at: datetime
+    last_clicked: Optional[datetime] = None
+
+# Page Models (for static pages like Privacy, Terms, etc.)
+class PageCreate(BaseModel):
+    slug: str
+    title: str
+    content: str
+    meta_description: Optional[str] = None
+    meta_keywords: Optional[str] = None
+    is_published: bool = True
+
+class PageUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    meta_description: Optional[str] = None
+    meta_keywords: Optional[str] = None
+    is_published: Optional[bool] = None
+
+class PageResponse(BaseModel):
+    id: str
+    slug: str
+    title: str
+    content: str
+    meta_description: Optional[str] = None
+    meta_keywords: Optional[str] = None
+    is_published: bool = True
+    created_at: datetime
+    updated_at: datetime
+
+# Blog Post Models
+class BlogPostCreate(BaseModel):
+    slug: str
+    title: str
+    excerpt: str
+    content: str
+    featured_image: Optional[str] = None
+    category: str = "Saving Tips"
+    tags: List[str] = []
+    meta_description: Optional[str] = None
+    is_published: bool = True
+
+class BlogPostUpdate(BaseModel):
+    title: Optional[str] = None
+    excerpt: Optional[str] = None
+    content: Optional[str] = None
+    featured_image: Optional[str] = None
+    category: Optional[str] = None
+    tags: Optional[List[str]] = None
+    meta_description: Optional[str] = None
+    is_published: Optional[bool] = None
+
+class BlogPostResponse(BaseModel):
+    id: str
+    slug: str
+    title: str
+    excerpt: str
+    content: str
+    featured_image: Optional[str] = None
+    category: str
+    tags: List[str] = []
+    meta_description: Optional[str] = None
+    is_published: bool = True
+    views: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+# Category Update Model
+class CategoryUpdate(BaseModel):
+    name: Optional[str] = None
+    slug: Optional[str] = None
+    icon: Optional[str] = None
+    image_url: Optional[str] = None
+    description: Optional[str] = None
+
 # ===================== AUTH ROUTES =====================
 
 @api_router.post("/auth/register")
@@ -447,6 +546,41 @@ async def create_category(data: CategoryCreate, request: Request):
     doc["id"] = str(result.inserted_id)
     doc["deal_count"] = 0
     return doc
+
+@api_router.get("/categories/{category_id}")
+async def get_category(category_id: str):
+    try:
+        category = await db.categories.find_one({"_id": ObjectId(category_id)}, {"_id": 0})
+        if not category:
+            raise HTTPException(status_code=404, detail="Category not found")
+        category["id"] = category_id
+        count = await db.coupons.count_documents({"category_name": category["name"], "is_active": True})
+        category["deal_count"] = count
+        return category
+    except Exception:
+        raise HTTPException(status_code=422, detail="Invalid category ID")
+
+@api_router.put("/categories/{category_id}", response_model=CategoryResponse)
+async def update_category(category_id: str, data: CategoryUpdate, request: Request):
+    await get_admin_user(request)
+    update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    if update_data:
+        update_data["updated_at"] = datetime.now(timezone.utc)
+        await db.categories.update_one({"_id": ObjectId(category_id)}, {"$set": update_data})
+    category = await db.categories.find_one({"_id": ObjectId(category_id)}, {"_id": 0})
+    if not category:
+        raise HTTPException(status_code=404, detail="Category not found")
+    category["id"] = category_id
+    category["deal_count"] = await db.coupons.count_documents({"category_name": category["name"], "is_active": True})
+    return category
+
+@api_router.delete("/categories/{category_id}")
+async def delete_category(category_id: str, request: Request):
+    await get_admin_user(request)
+    result = await db.categories.delete_one({"_id": ObjectId(category_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return {"message": "Category deleted"}
 
 # ===================== BRAND ROUTES =====================
 
@@ -747,6 +881,9 @@ async def get_analytics_overview(request: Request):
     active_coupons = await db.coupons.count_documents({"is_active": True})
     total_clicks = await db.clicks.count_documents({})
     total_users = await db.users.count_documents({})
+    total_pretty_links = await db.pretty_links.count_documents({})
+    total_pages = await db.pages.count_documents({})
+    total_blog_posts = await db.blog_posts.count_documents({})
     
     # Top brands by clicks
     top_brands_pipeline = [
@@ -760,14 +897,245 @@ async def get_analytics_overview(request: Request):
     week_ago = datetime.now(timezone.utc) - timedelta(days=7)
     recent_clicks = await db.clicks.count_documents({"created_at": {"$gte": week_ago}})
     
+    # Top pretty links
+    top_links = await db.pretty_links.find({}, {"_id": 0, "slug": 1, "clicks": 1, "title": 1}).sort("clicks", -1).limit(5).to_list(5)
+    
     return {
         "total_coupons": total_coupons,
         "active_coupons": active_coupons,
         "total_clicks": total_clicks,
         "total_users": total_users,
+        "total_pretty_links": total_pretty_links,
+        "total_pages": total_pages,
+        "total_blog_posts": total_blog_posts,
         "recent_clicks": recent_clicks,
-        "top_brands": [{"name": b["_id"], "clicks": b["total_clicks"]} for b in top_brands]
+        "top_brands": [{"name": b["_id"], "clicks": b["total_clicks"]} for b in top_brands],
+        "top_links": top_links
     }
+
+# ===================== PRETTY LINKS =====================
+
+@api_router.get("/pretty-links", response_model=List[PrettyLinkResponse])
+async def get_pretty_links(request: Request):
+    await get_admin_user(request)
+    links = await db.pretty_links.find({}).sort("created_at", -1).to_list(500)
+    result = []
+    for link in links:
+        link["id"] = str(link["_id"])
+        link["short_url"] = f"/go/{link['slug']}"
+        del link["_id"]
+        result.append(link)
+    return result
+
+@api_router.post("/pretty-links", response_model=PrettyLinkResponse)
+async def create_pretty_link(data: PrettyLinkCreate, request: Request):
+    await get_admin_user(request)
+    
+    # Check if slug exists
+    existing = await db.pretty_links.find_one({"slug": data.slug})
+    if existing:
+        raise HTTPException(status_code=400, detail="Slug already exists")
+    
+    doc = data.model_dump()
+    doc["clicks"] = 0
+    doc["created_at"] = datetime.now(timezone.utc)
+    doc["last_clicked"] = None
+    result = await db.pretty_links.insert_one(doc)
+    doc["id"] = str(result.inserted_id)
+    doc["short_url"] = f"/go/{doc['slug']}"
+    return doc
+
+@api_router.put("/pretty-links/{link_id}", response_model=PrettyLinkResponse)
+async def update_pretty_link(link_id: str, data: PrettyLinkUpdate, request: Request):
+    await get_admin_user(request)
+    update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    if update_data:
+        await db.pretty_links.update_one({"_id": ObjectId(link_id)}, {"$set": update_data})
+    link = await db.pretty_links.find_one({"_id": ObjectId(link_id)})
+    if not link:
+        raise HTTPException(status_code=404, detail="Link not found")
+    link["id"] = str(link["_id"])
+    link["short_url"] = f"/go/{link['slug']}"
+    del link["_id"]
+    return link
+
+@api_router.delete("/pretty-links/{link_id}")
+async def delete_pretty_link(link_id: str, request: Request):
+    await get_admin_user(request)
+    result = await db.pretty_links.delete_one({"_id": ObjectId(link_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Link not found")
+    return {"message": "Link deleted"}
+
+@api_router.get("/pretty-links/analytics/{link_id}")
+async def get_pretty_link_analytics(link_id: str, request: Request):
+    await get_admin_user(request)
+    link = await db.pretty_links.find_one({"_id": ObjectId(link_id)})
+    if not link:
+        raise HTTPException(status_code=404, detail="Link not found")
+    
+    # Get click history
+    clicks = await db.link_clicks.find({"link_id": link_id}).sort("created_at", -1).limit(100).to_list(100)
+    
+    return {
+        "link": {
+            "id": str(link["_id"]),
+            "slug": link["slug"],
+            "destination_url": link["destination_url"],
+            "total_clicks": link.get("clicks", 0)
+        },
+        "recent_clicks": [{"ip": c.get("ip", ""), "user_agent": c.get("user_agent", ""), "created_at": c["created_at"]} for c in clicks]
+    }
+
+# Public redirect endpoint (no auth required)
+@api_router.get("/go/{slug}")
+async def redirect_pretty_link(slug: str, request: Request):
+    link = await db.pretty_links.find_one({"slug": slug, "is_active": True})
+    if not link:
+        raise HTTPException(status_code=404, detail="Link not found")
+    
+    # Track click
+    await db.pretty_links.update_one(
+        {"_id": link["_id"]},
+        {"$inc": {"clicks": 1}, "$set": {"last_clicked": datetime.now(timezone.utc)}}
+    )
+    
+    # Log click details
+    await db.link_clicks.insert_one({
+        "link_id": str(link["_id"]),
+        "slug": slug,
+        "ip": request.client.host if request.client else "unknown",
+        "user_agent": request.headers.get("user-agent", ""),
+        "referer": request.headers.get("referer", ""),
+        "created_at": datetime.now(timezone.utc)
+    })
+    
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url=link["destination_url"], status_code=302)
+
+# ===================== PAGES (CMS) =====================
+
+@api_router.get("/pages")
+async def get_pages(published_only: bool = False):
+    query = {"is_published": True} if published_only else {}
+    pages = await db.pages.find(query).sort("created_at", -1).to_list(100)
+    result = []
+    for page in pages:
+        page["id"] = str(page["_id"])
+        del page["_id"]
+        result.append(page)
+    return result
+
+@api_router.get("/pages/{slug}")
+async def get_page_by_slug(slug: str):
+    page = await db.pages.find_one({"slug": slug})
+    if not page:
+        raise HTTPException(status_code=404, detail="Page not found")
+    page["id"] = str(page["_id"])
+    del page["_id"]
+    return page
+
+@api_router.post("/pages", response_model=PageResponse)
+async def create_page(data: PageCreate, request: Request):
+    await get_admin_user(request)
+    
+    existing = await db.pages.find_one({"slug": data.slug})
+    if existing:
+        raise HTTPException(status_code=400, detail="Page with this slug already exists")
+    
+    doc = data.model_dump()
+    doc["created_at"] = datetime.now(timezone.utc)
+    doc["updated_at"] = datetime.now(timezone.utc)
+    result = await db.pages.insert_one(doc)
+    doc["id"] = str(result.inserted_id)
+    return doc
+
+@api_router.put("/pages/{page_id}", response_model=PageResponse)
+async def update_page(page_id: str, data: PageUpdate, request: Request):
+    await get_admin_user(request)
+    update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    if update_data:
+        update_data["updated_at"] = datetime.now(timezone.utc)
+        await db.pages.update_one({"_id": ObjectId(page_id)}, {"$set": update_data})
+    page = await db.pages.find_one({"_id": ObjectId(page_id)})
+    if not page:
+        raise HTTPException(status_code=404, detail="Page not found")
+    page["id"] = str(page["_id"])
+    del page["_id"]
+    return page
+
+@api_router.delete("/pages/{page_id}")
+async def delete_page(page_id: str, request: Request):
+    await get_admin_user(request)
+    result = await db.pages.delete_one({"_id": ObjectId(page_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Page not found")
+    return {"message": "Page deleted"}
+
+# ===================== BLOG =====================
+
+@api_router.get("/blog")
+async def get_blog_posts(published_only: bool = True, limit: int = 20, skip: int = 0):
+    query = {"is_published": True} if published_only else {}
+    posts = await db.blog_posts.find(query).sort("created_at", -1).skip(skip).limit(limit).to_list(limit)
+    result = []
+    for post in posts:
+        post["id"] = str(post["_id"])
+        del post["_id"]
+        result.append(post)
+    return result
+
+@api_router.get("/blog/{slug}")
+async def get_blog_post(slug: str):
+    post = await db.blog_posts.find_one({"slug": slug})
+    if not post:
+        raise HTTPException(status_code=404, detail="Blog post not found")
+    
+    # Increment views
+    await db.blog_posts.update_one({"_id": post["_id"]}, {"$inc": {"views": 1}})
+    
+    post["id"] = str(post["_id"])
+    post["views"] = post.get("views", 0) + 1
+    del post["_id"]
+    return post
+
+@api_router.post("/blog", response_model=BlogPostResponse)
+async def create_blog_post(data: BlogPostCreate, request: Request):
+    await get_admin_user(request)
+    
+    existing = await db.blog_posts.find_one({"slug": data.slug})
+    if existing:
+        raise HTTPException(status_code=400, detail="Blog post with this slug already exists")
+    
+    doc = data.model_dump()
+    doc["views"] = 0
+    doc["created_at"] = datetime.now(timezone.utc)
+    doc["updated_at"] = datetime.now(timezone.utc)
+    result = await db.blog_posts.insert_one(doc)
+    doc["id"] = str(result.inserted_id)
+    return doc
+
+@api_router.put("/blog/{post_id}", response_model=BlogPostResponse)
+async def update_blog_post(post_id: str, data: BlogPostUpdate, request: Request):
+    await get_admin_user(request)
+    update_data = {k: v for k, v in data.model_dump().items() if v is not None}
+    if update_data:
+        update_data["updated_at"] = datetime.now(timezone.utc)
+        await db.blog_posts.update_one({"_id": ObjectId(post_id)}, {"$set": update_data})
+    post = await db.blog_posts.find_one({"_id": ObjectId(post_id)})
+    if not post:
+        raise HTTPException(status_code=404, detail="Blog post not found")
+    post["id"] = str(post["_id"])
+    del post["_id"]
+    return post
+
+@api_router.delete("/blog/{post_id}")
+async def delete_blog_post(post_id: str, request: Request):
+    await get_admin_user(request)
+    result = await db.blog_posts.delete_one({"_id": ObjectId(post_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Blog post not found")
+    return {"message": "Blog post deleted"}
 
 @api_router.get("/analytics/clicks")
 async def get_click_analytics(request: Request, days: int = 7):
@@ -1080,7 +1448,12 @@ async def seed_admin():
 async def seed_initial_data():
     """Seed initial categories and sample coupons"""
     
-    # Check if data exists
+    # Seed pages/blogs/links independently (they have their own guards)
+    await seed_static_pages()
+    await seed_blog_posts()
+    await seed_pretty_links()
+    
+    # Check if categories/coupons already exist
     if await db.categories.count_documents({}) > 0:
         return
     
@@ -1196,7 +1569,561 @@ async def seed_initial_data():
         coupon["deal_score"] = calculate_deal_score(coupon)
     
     await db.coupons.insert_many(sample_coupons)
+    logger.info("Initial coupons seeded")
+    
     logger.info("Initial data seeded")
+
+async def seed_static_pages():
+    """Seed static pages like Privacy Policy, Terms, About, Contact"""
+    if await db.pages.count_documents({}) > 0:
+        return
+    
+    pages = [
+        {
+            "slug": "privacy-policy",
+            "title": "Privacy Policy",
+            "meta_description": "DISCCART Privacy Policy - Learn how we collect, use, and protect your personal information when you use our coupon and deals platform.",
+            "meta_keywords": "privacy policy, data protection, user privacy, disccart privacy",
+            "content": """
+# Privacy Policy
+
+**Last Updated: March 2026**
+
+Welcome to DISCCART. We are committed to protecting your privacy and ensuring the security of your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you visit our website.
+
+## Information We Collect
+
+### Personal Information
+When you use DISCCART, we may collect the following information:
+- **Account Information**: Name, email address, and password when you create an account
+- **Usage Data**: Pages visited, deals clicked, coupons copied, and time spent on our platform
+- **Device Information**: Browser type, IP address, device type, and operating system
+
+### Automatically Collected Information
+- Cookies and similar tracking technologies
+- Analytics data through Google Analytics
+- Interaction data with our deals and coupons
+
+## How We Use Your Information
+
+We use the collected information for:
+- Providing personalized deal recommendations
+- Improving our services and user experience
+- Sending newsletters and promotional content (with your consent)
+- Analyzing website traffic and user behavior
+- Preventing fraud and ensuring security
+
+## Third-Party Services
+
+DISCCART works with various affiliate partners and third-party services:
+- **Affiliate Networks**: We earn commissions when you make purchases through our affiliate links
+- **Analytics**: Google Analytics to understand user behavior
+- **Advertising**: Facebook Pixel for targeted advertising
+
+## Your Rights
+
+You have the right to:
+- Access your personal data
+- Request correction of inaccurate data
+- Request deletion of your data
+- Opt-out of marketing communications
+- Withdraw consent at any time
+
+## Data Security
+
+We implement appropriate security measures to protect your personal information, including:
+- SSL encryption for data transmission
+- Secure password hashing
+- Regular security audits
+
+## Contact Us
+
+For any privacy-related questions, contact us at:
+- **Email**: disccartindia@gmail.com
+- **Phone**: +91 9111036751
+
+## Changes to This Policy
+
+We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page.
+""",
+            "is_published": True
+        },
+        {
+            "slug": "terms-and-conditions",
+            "title": "Terms & Conditions",
+            "meta_description": "DISCCART Terms and Conditions - Read our terms of service, user responsibilities, and guidelines for using our coupon platform.",
+            "meta_keywords": "terms and conditions, terms of service, user agreement, disccart terms",
+            "content": """
+# Terms & Conditions
+
+**Effective Date: March 2026**
+
+Welcome to DISCCART. By accessing and using our website, you agree to be bound by these Terms and Conditions.
+
+## 1. Acceptance of Terms
+
+By using DISCCART, you acknowledge that you have read, understood, and agree to be bound by these terms. If you do not agree, please do not use our services.
+
+## 2. Description of Service
+
+DISCCART is an online platform that provides:
+- Coupon codes and promo codes from various online retailers
+- Deal alerts and discount notifications
+- Affiliate links to partner merchants
+- Saving tips and shopping guides
+
+## 3. User Responsibilities
+
+As a user of DISCCART, you agree to:
+- Provide accurate information when creating an account
+- Use the platform for personal, non-commercial purposes only
+- Not attempt to manipulate or abuse our affiliate system
+- Not scrape, copy, or redistribute our content without permission
+- Comply with all applicable laws and regulations
+
+## 4. Coupon and Deal Accuracy
+
+While we strive to provide accurate and up-to-date information:
+- Coupons and deals are subject to change without notice
+- We do not guarantee the validity of any coupon or deal
+- Final terms are determined by the respective merchants
+- Prices and discounts are verified at the time of posting
+
+## 5. Affiliate Disclosure
+
+DISCCART participates in affiliate marketing programs. This means:
+- We earn commissions on qualifying purchases made through our links
+- This does not affect the price you pay
+- Our recommendations are based on value, not commission rates
+
+## 6. Intellectual Property
+
+All content on DISCCART, including:
+- Text, graphics, logos, and images
+- Software and code
+- Deal descriptions and reviews
+
+Is the property of DISCCART and protected by intellectual property laws.
+
+## 7. Limitation of Liability
+
+DISCCART shall not be liable for:
+- Expired or invalid coupons
+- Changes in merchant terms or prices
+- Any losses arising from use of our platform
+- Third-party website content or practices
+
+## 8. Modifications
+
+We reserve the right to modify these terms at any time. Continued use of the platform after changes constitutes acceptance of the new terms.
+
+## 9. Contact Information
+
+For questions about these Terms, contact us:
+- **Email**: disccartindia@gmail.com
+- **Phone**: +91 9111036751
+""",
+            "is_published": True
+        },
+        {
+            "slug": "about-us",
+            "title": "About Us",
+            "meta_description": "Learn about DISCCART - India's trusted platform for finding the best online shopping deals, coupons, and promo codes from top brands.",
+            "meta_keywords": "about disccart, coupon website india, deals platform, online shopping savings",
+            "content": """
+# About DISCCART
+
+## Your Trusted Savings Partner
+
+Welcome to **DISCCART** – India's smart destination for discovering the best online shopping deals, coupons, and promo codes. We're passionate about helping shoppers save money on every purchase.
+
+## Our Mission
+
+At DISCCART, our mission is simple: **Help every Indian shopper save money while shopping online.** We believe that everyone deserves access to the best deals, and no one should pay full price when discounts are available.
+
+## What We Do
+
+### Curated Deals
+Our team constantly scouts the internet for the best deals from top brands like Amazon, Flipkart, Myntra, Swiggy, and hundreds more. We verify each coupon before posting to ensure you always get working codes.
+
+### Real-Time Updates
+Deals change fast, and so do we. Our platform is updated multiple times daily to bring you the freshest offers and remove expired coupons.
+
+### Easy to Use
+Finding savings shouldn't be complicated. Our clean, user-friendly interface makes it easy to:
+- Browse deals by category
+- Search for specific brands
+- Copy codes with one click
+- Get redirected to deals instantly
+
+## Why Choose DISCCART?
+
+- **Verified Coupons**: Every code is tested before publishing
+- **100% Free**: No hidden fees or premium subscriptions
+- **Wide Coverage**: Deals from 500+ brands across all categories
+- **Daily Updates**: Fresh deals added every day
+- **Mobile Friendly**: Save money on any device
+
+## Our Values
+
+### Transparency
+We clearly disclose our affiliate relationships. When you use our links, we may earn a commission – but this never affects our recommendations or the price you pay.
+
+### Quality Over Quantity
+We focus on curating the best deals rather than listing everything. Quality and relevance matter more than numbers.
+
+### User First
+Every feature we build and every deal we post is designed with our users in mind. Your savings are our success.
+
+## Connect With Us
+
+We love hearing from our community! Follow us on social media for instant deal alerts and saving tips:
+
+- **Instagram**: @disccart
+- **Telegram**: t.me/disccart
+- **WhatsApp**: Join our channel for daily deals
+
+## Contact
+
+Have questions or suggestions? We'd love to hear from you:
+- **Email**: disccartindia@gmail.com
+- **Phone**: +91 9111036751
+
+---
+
+*Thank you for choosing DISCCART. Happy Saving!*
+""",
+            "is_published": True
+        },
+        {
+            "slug": "contact-us",
+            "title": "Contact Us",
+            "meta_description": "Contact DISCCART - Get in touch with us for support, partnership inquiries, or feedback about our coupon and deals platform.",
+            "meta_keywords": "contact disccart, customer support, partnership, feedback",
+            "content": """
+# Contact Us
+
+We're here to help! Whether you have questions, feedback, or partnership inquiries, we'd love to hear from you.
+
+## Get In Touch
+
+### Customer Support
+Having trouble with a coupon or need assistance? Our support team is ready to help.
+
+- **Email**: disccartindia@gmail.com
+- **Phone**: +91 9111036751
+- **Response Time**: Within 24 hours
+
+### Business Inquiries
+
+#### For Brands & Merchants
+Want to feature your deals on DISCCART? We partner with brands of all sizes to promote exclusive offers to our engaged audience.
+
+**Benefits of partnering with us:**
+- Access to thousands of deal-seeking shoppers
+- Increased brand visibility
+- Performance-based affiliate marketing
+- Custom promotional campaigns
+
+#### For Advertisers
+Reach our audience of smart shoppers through targeted advertising opportunities.
+
+### Follow Us
+
+Stay connected for instant deal alerts and saving tips:
+
+- **Instagram**: [@disccart](https://www.instagram.com/disccart)
+- **Telegram**: [t.me/disccart](https://t.me/disccart)
+- **WhatsApp**: [Join our channel](https://whatsapp.com/channel/0029Vb6dtO41t90dZb1BnB3K)
+
+## Feedback
+
+Your feedback helps us improve! Let us know:
+- Which deals you'd like to see more of
+- Features you'd like us to add
+- Any issues you've encountered
+
+## Office Address
+
+DISCCART
+India
+
+---
+
+*We typically respond to all inquiries within 24 business hours.*
+""",
+            "is_published": True
+        }
+    ]
+    
+    for page in pages:
+        page["created_at"] = datetime.now(timezone.utc)
+        page["updated_at"] = datetime.now(timezone.utc)
+    
+    await db.pages.insert_many(pages)
+    logger.info("Static pages seeded")
+
+async def seed_blog_posts():
+    """Seed initial blog posts"""
+    if await db.blog_posts.count_documents({}) > 0:
+        return
+    
+    posts = [
+        {
+            "slug": "how-to-save-money-online-shopping-india",
+            "title": "How to Save Money While Shopping Online in India",
+            "excerpt": "Discover proven strategies to save money on your online purchases. Learn about coupons, cashback, timing, and more.",
+            "featured_image": "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?w=800",
+            "category": "Saving Tips",
+            "tags": ["saving tips", "online shopping", "coupons", "cashback"],
+            "meta_description": "Complete guide to saving money while shopping online in India. Learn about coupons, cashback, best timing, and insider tips.",
+            "content": """
+# How to Save Money While Shopping Online in India
+
+Online shopping has become extremely popular in India. Millions of people buy products daily from platforms like Amazon, Flipkart, and Myntra. While shopping online is convenient, many shoppers end up paying more than necessary.
+
+## 1. Always Search for Coupons First
+
+Before making any purchase, spend a few minutes searching for coupon codes. Sites like DISCCART curate verified coupons from hundreds of brands, saving you the hassle of searching everywhere.
+
+**Pro Tip**: Check for bank-specific offers too. Many credit and debit cards offer additional discounts on specific platforms.
+
+## 2. Use Cashback Apps
+
+Cashback apps can help you earn money back on your purchases. Popular options in India include:
+- Cashkaro
+- GoPayz
+- Amazon Pay
+
+Stack cashback with coupons for maximum savings!
+
+## 3. Time Your Purchases
+
+The best time to shop online in India:
+- **Festive Sales**: Diwali, Holi, Independence Day
+- **End of Season**: January and July for fashion
+- **Flash Sales**: Big Billion Days, Great Indian Festival
+- **Weekends**: Many sites offer weekend-only deals
+
+## 4. Compare Prices
+
+Don't buy from the first site you visit. The same product can have different prices across platforms. Use price comparison tools or manually check multiple sites.
+
+## 5. Sign Up for Newsletters
+
+Yes, your inbox might get cluttered, but brand newsletters often contain:
+- Early access to sales
+- Exclusive coupon codes
+- Flash sale notifications
+
+Create a separate email for shopping newsletters to keep things organized.
+
+## 6. Use Price Drop Alerts
+
+Many browser extensions and apps can track prices and alert you when they drop. This is especially useful for big purchases like electronics.
+
+## 7. Don't Ignore Cart Abandonment Emails
+
+If you add items to cart and leave without buying, many sites send follow-up emails with additional discounts. This isn't a guaranteed strategy but works surprisingly often!
+
+## Conclusion
+
+Smart online shopping is all about patience and research. By following these tips and regularly checking DISCCART for the latest deals, you can save thousands of rupees on your purchases.
+
+*Happy Saving!*
+""",
+            "is_published": True,
+            "views": 0
+        },
+        {
+            "slug": "best-electronics-deals-india",
+            "title": "Best Electronics Deals in India (2026) – Latest Gadgets Discounts",
+            "excerpt": "Find the best electronics deals in India. Save big on smartphones, laptops, headphones, and more with our curated list of verified offers.",
+            "featured_image": "https://images.unsplash.com/photo-1593640495253-23196b27a87f?w=800",
+            "category": "Deal Guides",
+            "tags": ["electronics", "gadgets", "smartphones", "laptops", "deals"],
+            "meta_description": "Discover the best electronics deals in India for 2026. Find discounts on smartphones, laptops, headphones, and more.",
+            "content": """
+# Best Electronics Deals in India
+
+Electronics have become an essential part of everyday life. From smartphones and laptops to headphones and smartwatches, everyone is looking for the best deals before making a purchase.
+
+## Top Electronics Categories with Great Deals
+
+### Smartphones
+The smartphone market in India is highly competitive, which means great deals for consumers:
+- **Budget Phones**: Realme, Redmi, Samsung M-series
+- **Mid-Range**: OnePlus Nord, Samsung A-series, iPhone SE
+- **Flagship**: iPhone 15, Samsung S24, OnePlus 12
+
+**Best Time to Buy**: New model launches, festive sales
+
+### Laptops
+Whether for work, gaming, or study:
+- **Student Laptops**: HP, Lenovo, Acer (₹30,000 - ₹50,000)
+- **Professional**: Dell, MacBook, ThinkPad
+- **Gaming**: ASUS ROG, MSI, Acer Predator
+
+### Audio
+Headphones and speakers see frequent discounts:
+- **TWS Earbuds**: Sony, Jabra, Samsung, boAt
+- **Over-ear**: Sony WH-1000XM5, Bose QC
+- **Speakers**: JBL, Marshall, Sony
+
+## Where to Find the Best Electronics Deals
+
+1. **Amazon India**: Great for variety and quick delivery
+2. **Flipkart**: Often has exclusive phone launches
+3. **Croma & Reliance Digital**: Good for large appliances
+4. **Brand Websites**: Sometimes have exclusive offers
+
+## Tips for Buying Electronics Online
+
+1. **Check Reviews**: Always read user reviews before buying
+2. **Compare Specs**: Don't just look at the price
+3. **Warranty**: Ensure you're getting official warranty
+4. **Use Coupons**: Check DISCCART for the latest codes
+5. **Bank Offers**: Credit card EMI and instant discounts
+
+## Current Top Deals
+
+Visit our [Electronics Deals](/category/electronics) page for the latest verified offers updated daily.
+
+---
+
+*Bookmark this page and check back regularly for updated deals!*
+""",
+            "is_published": True,
+            "views": 0
+        },
+        {
+            "slug": "coupon-codes-guide-beginners",
+            "title": "The Ultimate Guide to Using Coupon Codes Online",
+            "excerpt": "New to online coupons? Learn everything about finding, using, and maximizing coupon codes for your online shopping.",
+            "featured_image": "https://images.unsplash.com/photo-1556742077-0a6b6a4a4ac4?w=800",
+            "category": "Coupon Guides",
+            "tags": ["coupons", "promo codes", "beginner guide", "how to"],
+            "meta_description": "Complete beginner's guide to using coupon codes online. Learn how to find, apply, and maximize savings with promo codes.",
+            "content": """
+# The Ultimate Guide to Using Coupon Codes Online
+
+If you're new to the world of online coupons and promo codes, this guide will help you understand everything you need to know to start saving money.
+
+## What Are Coupon Codes?
+
+Coupon codes (also called promo codes, discount codes, or voucher codes) are alphanumeric strings that you enter during checkout to receive discounts. They can offer:
+- Percentage discounts (e.g., 20% OFF)
+- Flat discounts (e.g., ₹500 OFF)
+- Free shipping
+- Free gifts with purchase
+- Buy-one-get-one offers
+
+## Types of Coupon Codes
+
+### 1. Site-Wide Codes
+Apply to your entire order. Example: "SAVE20" for 20% off everything.
+
+### 2. Product-Specific Codes
+Only work on certain products or categories.
+
+### 3. First-Order Codes
+Exclusive discounts for new customers.
+
+### 4. Minimum Purchase Codes
+Require a minimum order value. Example: "₹200 off on orders above ₹999"
+
+### 5. Bank/Card Codes
+Special discounts when using specific payment methods.
+
+## How to Use Coupon Codes
+
+1. **Find a Code**: Visit DISCCART and browse deals
+2. **Copy the Code**: Click the "Copy" button
+3. **Add Items to Cart**: Shop on the retailer's website
+4. **Proceed to Checkout**: Go to the payment page
+5. **Apply Code**: Look for "Have a promo code?" or similar
+6. **Enter & Apply**: Paste your code and click Apply
+7. **Verify Discount**: Ensure the discount is reflected
+
+## Common Problems and Solutions
+
+### Code Not Working?
+- Check expiration date
+- Verify minimum purchase requirements
+- Ensure products are eligible
+- Check if it's a first-time user code
+- Look for typos
+
+### Multiple Codes?
+Most sites allow only one code per order. Choose the one that gives maximum savings.
+
+## Pro Tips for Maximum Savings
+
+1. **Stack with Sales**: Use codes during sales for extra savings
+2. **Sign Up for Alerts**: Follow DISCCART on social media
+3. **Check Before Buying**: Always search for codes before checkout
+4. **Use Browser Extensions**: Some tools auto-find codes
+
+## Where to Find Reliable Codes
+
+- **DISCCART**: Verified, updated daily
+- **Brand Newsletters**: Sign up for exclusive codes
+- **Social Media**: Follow brands for flash deals
+
+---
+
+*Start your saving journey today at DISCCART!*
+""",
+            "is_published": True,
+            "views": 0
+        }
+    ]
+    
+    for post in posts:
+        post["created_at"] = datetime.now(timezone.utc)
+        post["updated_at"] = datetime.now(timezone.utc)
+    
+    await db.blog_posts.insert_many(posts)
+    logger.info("Blog posts seeded")
+
+async def seed_pretty_links():
+    """Seed sample pretty links"""
+    if await db.pretty_links.count_documents({}) > 0:
+        return
+    
+    links = [
+        {
+            "slug": "amazon-deals",
+            "destination_url": "https://www.amazon.in?tag=disccart",
+            "title": "Amazon India Deals",
+            "description": "Shop the best deals on Amazon India",
+            "is_active": True,
+            "clicks": 0
+        },
+        {
+            "slug": "flipkart-offers",
+            "destination_url": "https://www.flipkart.com?affid=disccart",
+            "title": "Flipkart Offers",
+            "description": "Explore exclusive Flipkart offers",
+            "is_active": True,
+            "clicks": 0
+        },
+        {
+            "slug": "myntra-sale",
+            "destination_url": "https://www.myntra.com?utm_source=disccart",
+            "title": "Myntra Fashion Sale",
+            "description": "Latest fashion deals on Myntra",
+            "is_active": True,
+            "clicks": 0
+        }
+    ]
+    
+    for link in links:
+        link["created_at"] = datetime.now(timezone.utc)
+        link["last_clicked"] = None
+    
+    await db.pretty_links.insert_many(links)
+    logger.info("Pretty links seeded")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

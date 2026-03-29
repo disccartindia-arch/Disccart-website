@@ -60,11 +60,17 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-4">
+            <Link to="/deals" className="text-gray-600 hover:text-[#FF8C00] font-medium transition-colors" data-testid="deals-link">
+              Deals
+            </Link>
             <Link to="/categories" className="text-gray-600 hover:text-[#FF8C00] font-medium transition-colors" data-testid="categories-link">
               Categories
             </Link>
-            <Link to="/trending" className="text-gray-600 hover:text-[#FF8C00] font-medium transition-colors" data-testid="trending-link">
-              Trending
+            <Link to="/deals/limited-time" className="text-gray-600 hover:text-[#FF8C00] font-medium transition-colors" data-testid="limited-link">
+              Limited Time
+            </Link>
+            <Link to="/blog" className="text-gray-600 hover:text-[#FF8C00] font-medium transition-colors" data-testid="blog-link">
+              Blog
             </Link>
             
             {isAuthenticated ? (
@@ -129,6 +135,13 @@ export default function Header() {
           <div className="md:hidden py-4 border-t border-gray-100" data-testid="mobile-menu">
             <nav className="flex flex-col gap-4">
               <Link 
+                to="/deals" 
+                className="text-gray-600 hover:text-[#FF8C00] font-medium py-2"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Deals
+              </Link>
+              <Link 
                 to="/categories" 
                 className="text-gray-600 hover:text-[#FF8C00] font-medium py-2"
                 onClick={() => setMobileMenuOpen(false)}
@@ -136,11 +149,18 @@ export default function Header() {
                 Categories
               </Link>
               <Link 
-                to="/trending" 
+                to="/deals/limited-time" 
                 className="text-gray-600 hover:text-[#FF8C00] font-medium py-2"
                 onClick={() => setMobileMenuOpen(false)}
               >
-                Trending
+                Limited Time
+              </Link>
+              <Link 
+                to="/blog" 
+                className="text-gray-600 hover:text-[#FF8C00] font-medium py-2"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Blog
               </Link>
               {isAuthenticated ? (
                 <>

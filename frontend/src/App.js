@@ -29,6 +29,12 @@ import SearchPage from "./pages/SearchPage";
 import SeoPage from "./pages/SeoPage";
 import ProfilePage from "./pages/ProfilePage";
 import AdminPage from "./pages/AdminPage";
+import BlogPage from "./pages/BlogPage";
+import BlogPostPage from "./pages/BlogPostPage";
+import StaticPage from "./pages/StaticPage";
+import DealsPage from "./pages/DealsPage";
+import RedirectPage from "./pages/RedirectPage";
+import LimitedDealsPage from "./pages/LimitedDealsPage";
 
 function App() {
   return (
@@ -46,9 +52,15 @@ function App() {
                 <Route path="/category/:slug" element={<CategoryPage />} />
                 <Route path="/trending" element={<TrendingPage />} />
                 <Route path="/search" element={<SearchPage />} />
+                <Route path="/deals" element={<DealsPage />} />
+                <Route path="/deals/limited-time" element={<LimitedDealsPage />} />
                 <Route path="/deals/:pageType" element={<SeoPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/admin" element={<AdminPage />} />
+                <Route path="/blog" element={<BlogPage />} />
+                <Route path="/blog/:slug" element={<BlogPostPage />} />
+                <Route path="/page/:slug" element={<StaticPage />} />
+                <Route path="/go/:slug" element={<RedirectPage />} />
               </Routes>
             </main>
             <Footer />

@@ -74,8 +74,23 @@ export const getCategories = async () => {
   return data;
 };
 
+export const getCategory = async (id) => {
+  const { data } = await api.get(`/categories/${id}`);
+  return data;
+};
+
 export const createCategory = async (categoryData) => {
   const { data } = await api.post('/categories', categoryData);
+  return data;
+};
+
+export const updateCategory = async (id, categoryData) => {
+  const { data } = await api.put(`/categories/${id}`, categoryData);
+  return data;
+};
+
+export const deleteCategory = async (id) => {
+  const { data } = await api.delete(`/categories/${id}`);
   return data;
 };
 
@@ -116,6 +131,79 @@ export const getSeoPageData = async (pageType) => {
 // AI Content
 export const generateAIContent = async (contentData) => {
   const { data } = await api.post('/ai/generate-content', contentData);
+  return data;
+};
+
+// Pretty Links
+export const getPrettyLinks = async () => {
+  const { data } = await api.get('/pretty-links');
+  return data;
+};
+
+export const createPrettyLink = async (linkData) => {
+  const { data } = await api.post('/pretty-links', linkData);
+  return data;
+};
+
+export const updatePrettyLink = async (id, linkData) => {
+  const { data } = await api.put(`/pretty-links/${id}`, linkData);
+  return data;
+};
+
+export const deletePrettyLink = async (id) => {
+  const { data } = await api.delete(`/pretty-links/${id}`);
+  return data;
+};
+
+// Pages (CMS)
+export const getPages = async (publishedOnly = false) => {
+  const { data } = await api.get('/pages', { params: { published_only: publishedOnly } });
+  return data;
+};
+
+export const getPage = async (slug) => {
+  const { data } = await api.get(`/pages/${slug}`);
+  return data;
+};
+
+export const createPage = async (pageData) => {
+  const { data } = await api.post('/pages', pageData);
+  return data;
+};
+
+export const updatePage = async (id, pageData) => {
+  const { data } = await api.put(`/pages/${id}`, pageData);
+  return data;
+};
+
+export const deletePage = async (id) => {
+  const { data } = await api.delete(`/pages/${id}`);
+  return data;
+};
+
+// Blog
+export const getBlogPosts = async (publishedOnly = true, limit = 20, skip = 0) => {
+  const { data } = await api.get('/blog', { params: { published_only: publishedOnly, limit, skip } });
+  return data;
+};
+
+export const getBlogPost = async (slug) => {
+  const { data } = await api.get(`/blog/${slug}`);
+  return data;
+};
+
+export const createBlogPost = async (postData) => {
+  const { data } = await api.post('/blog', postData);
+  return data;
+};
+
+export const updateBlogPost = async (id, postData) => {
+  const { data } = await api.put(`/blog/${id}`, postData);
+  return data;
+};
+
+export const deleteBlogPost = async (id) => {
+  const { data } = await api.delete(`/blog/${id}`);
   return data;
 };
 
