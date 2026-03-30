@@ -35,21 +35,13 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2.5 flex-shrink-0" data-testid="logo-link">
-            {/* Basket Icon SVG */}
-            <svg viewBox="0 0 48 48" className="h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 flex-shrink-0" data-testid="logo-icon">
-              {/* Handle */}
-              <path d="M14 18C14 12 18 6 24 6C30 6 34 12 34 18" fill="none" stroke="#ee922c" strokeWidth="3.5" strokeLinecap="round"/>
-              {/* Basket body */}
-              <rect x="8" y="18" width="32" height="24" rx="4" fill="#3c7b48"/>
-              {/* Basket rim */}
-              <rect x="6" y="16" width="36" height="5" rx="2.5" fill="#2d6339"/>
-              {/* Percentage symbol */}
-              <circle cx="18" cy="28" r="2.5" fill="#ee922c"/>
-              <circle cx="30" cy="36" r="2.5" fill="#ee922c"/>
-              <line x1="30" y1="26" x2="18" y2="38" stroke="#ee922c" strokeWidth="2.5" strokeLinecap="round"/>
-            </svg>
-            {/* Brand Text */}
+          <Link to="/" className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0" data-testid="logo-link">
+            <img 
+              src="https://customer-assets.emergentagent.com/job_coupon-hub-35/artifacts/3o6cjbcz_IMG_2340.jpeg"
+              alt="DISCCART"
+              className="h-10 sm:h-11 md:h-12 w-auto object-contain"
+              data-testid="logo-icon"
+            />
             <span className="font-display font-black text-xl sm:text-2xl md:text-3xl tracking-tight" data-testid="logo-text" style={{
               background: 'linear-gradient(135deg, #3c7b48 0%, #2d9e4b 40%, #ee922c 70%, #e8751a 100%)',
               WebkitBackgroundClip: 'text',
