@@ -71,7 +71,7 @@ MongoDB Atlas provides a free 512MB cloud database.
    - **Root Directory**: `backend`
    - **Runtime**: Python
    - **Build Command**: `pip install -r requirements.txt`
-   - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+   - **Start Command**: `uvicorn app:app --host 0.0.0.0 --port $PORT`
    - **Plan**: Free
 
 ### 2.4 Set Environment Variables
@@ -231,7 +231,8 @@ The backend already handles this. Make sure both frontend and backend use HTTPS.
 ```
 your-repo/
 ├── backend/
-│   ├── main.py                 ← Render entry point
+│   ├── app.py                  ← Render entry point (imports from server.py)
+│   ├── main.py                 ← Alternative entry point
 │   ├── server.py               ← All API logic
 │   ├── Procfile                ← Render start command
 │   ├── render.yaml             ← Render config (optional)
