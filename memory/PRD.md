@@ -15,6 +15,8 @@ Build DISCCART – an AI-powered coupon and deals platform. Scalable startup pla
 - Google Analytics integration
 - CMS for blog, static pages, categories
 - Pretty Links URL shortener for affiliate tracking
+- AI Deal Score + Fake Coupon Detection
+- Dedicated Coupons page with filters
 
 ## Tech Stack
 - **Frontend**: React.js, TailwindCSS, Shadcn UI, Framer Motion, React Helmet Async, React Markdown
@@ -24,7 +26,7 @@ Build DISCCART – an AI-powered coupon and deals platform. Scalable startup pla
 - **AI**: OpenAI GPT-5.2 via Emergent LLM Key (deal content generation)
 - **Analytics**: Google Analytics 4 (G-Y5T6ECMHE2)
 
-## What's Implemented (as of March 29, 2026)
+## What's Implemented
 
 ### Phase 1 - MVP (DONE)
 - JWT Authentication with brute-force protection
@@ -36,8 +38,7 @@ Build DISCCART – an AI-powered coupon and deals platform. Scalable startup pla
 - Search, Category, Trending pages
 
 ### Phase 2 - SEO & Analytics (DONE)
-- XML Sitemap generation
-- Robots.txt
+- XML Sitemap generation, Robots.txt
 - Dynamic meta tags via React Helmet Async
 - Google Analytics 4 integration
 - SEO-optimized pages for brands/categories
@@ -53,6 +54,14 @@ Build DISCCART – an AI-powered coupon and deals platform. Scalable startup pla
 - CSV bulk upload for coupons
 - AI content generation for deals
 
+### Phase 4 - Deal Score, Coupons Page & UX (DONE - March 30, 2026)
+- **AI Deal Score**: Enhanced scoring algorithm (0-100) factoring discount %, price comparison, popularity, freshness, verification. Circular SVG badge on every deal/coupon card (Great/Good/Fair)
+- **Fake Coupon Detection**: Verification badges (Verified / Possibly Expired / Unverified) based on expiry date and verification flag
+- **Coupons Page** (`/coupons`): Dedicated page showing ONLY coupons with codes. Category filters, Popular/Latest sort, search. Each card has: code display, discount badge, copy button, deal score, verification badge
+- **Navigation Update**: Added "Coupons" to desktop nav, mobile menu, and bottom nav
+- **Logo Improvement**: Responsive sizing (h-10 mobile, h-12 sm, h-14 md, h-16 desktop)
+- **New API**: `/api/coupons-only` endpoint with filtering, sorting, search
+
 ## Database Collections
 - `users`: {email, password_hash, name, role, created_at}
 - `coupons`: {title, description, code, discount_type, discount_value, brand_name, category_name, affiliate_url, image_url, expires_at, is_featured, is_verified, is_active, tags, clicks, deal_score, created_at}
@@ -60,12 +69,11 @@ Build DISCCART – an AI-powered coupon and deals platform. Scalable startup pla
 - `pages`: {slug, title, content, meta_description, meta_keywords, is_published, created_at, updated_at}
 - `blog_posts`: {slug, title, excerpt, content, featured_image, category, tags, meta_description, is_published, views, created_at, updated_at}
 - `pretty_links`: {slug, destination_url, title, description, is_active, clicks, created_at, last_clicked}
-- `clicks`: {coupon_id, source, ip, user_agent, created_at}
-- `link_clicks`: {link_id, slug, ip, user_agent, referer, created_at}
 
 ## API Endpoints
 ### Auth: POST /api/auth/login, /register, /logout, /refresh | GET /api/auth/me
 ### Coupons: GET/POST /api/coupons | GET/PUT/DELETE /api/coupons/:id | POST /api/coupons/bulk-upload
+### Coupons Only: GET /api/coupons-only (filter: category, search, sort_by=popular|latest)
 ### Categories: GET/POST /api/categories | GET/PUT/DELETE /api/categories/:id
 ### Pages: GET /api/pages | GET /api/pages/:slug | POST/PUT/DELETE (admin)
 ### Blog: GET /api/blog | GET /api/blog/:slug | POST/PUT/DELETE (admin)
@@ -80,7 +88,6 @@ Build DISCCART – an AI-powered coupon and deals platform. Scalable startup pla
 
 ### P2
 - User wishlist system
-- "Deal Score" AI-based ranking & Fake coupon detection
 - Email capture popup for deal alerts
 - Push notifications (Firebase)
 - "Best time to buy" hints
