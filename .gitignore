@@ -2,64 +2,24 @@
 node_modules/
 __pycache__/
 *.pyc
-*.pyo
-*.pyd
-.Python
-env/
-venv/
-.venv/
-pip-log.txt
-pip-delete-this-directory.txt
-
-# Environment variables
 .env
-.env.local
-.env.*.local
-*.env
 
-# Build outputs
-build/
-dist/
-*.egg-info/
-.eggs/
+# Build output
+frontend/build/
 
 # IDE
-.idea/
 .vscode/
-*.swp
-*.swo
-*~
+.idea/
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Logs
-*.log
-logs/
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
+# Emergent platform
+.emergent/
 
-# Test credentials (sensitive)
-/app/memory/test_credentials.md
-test_credentials.md
-
-# Test reports
-/app/test_reports/
+# Test files
 test_reports/
-
-# Coverage
-coverage/
-.coverage
-htmlcov/
-
-# Misc
-*.bak
-*.tmp
-.cache/
-frontend/node_modules/.cache/default-development/0.pack
-frontend/node_modules/.cache/default-development/5.pack
-frontend/node_modules/.cache/default-development/2.pack
+*.log
+frontend/node_modules/.cache/default-development/6.pack
 disccart.zip
-frontend/node_modules/.cache/default-development/1.pack

@@ -36,7 +36,7 @@ export default function Footer() {
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center gap-2 mb-4">
               <img 
-                src="https://customer-assets.emergentagent.com/job_4782f2ef-8614-4604-843b-cc10ee1e98da/artifacts/a891hwo3_IMG_2239.png" 
+                src="https://customer-assets.emergentagent.com/job_coupon-hub-35/artifacts/3o6cjbcz_IMG_2340.jpeg" 
                 alt="DISCCART" 
                 className="h-10 w-auto"
               />
