@@ -131,7 +131,7 @@ export default function ShareButtons({ deal, variant = 'card' }) {
       {/* Copy Link */}
       <motion.button
         onClick={copyLink}
-        className={`${buttonBaseClass} ${copied ? 'bg-[#228B22] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'} shadow-md hover:shadow-lg`}
+        className={`${buttonBaseClass} ${copied ? 'bg-[#3c7b48] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'} shadow-md hover:shadow-lg`}
         whileHover={{ y: -2 }}
         whileTap={{ scale: 0.95 }}
         title="Copy Link"

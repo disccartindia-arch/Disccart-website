@@ -135,7 +135,7 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
             </button>
 
             {/* Header */}
-            <div className="bg-gradient-to-r from-[#FF8C00] to-[#E67E00] p-6 text-white">
+            <div className="bg-gradient-to-r from-[#ee922c] to-[#d9811f] p-6 text-white">
               <div className="flex items-center gap-2 mb-2">
                 <Sparkles className="w-5 h-5" />
                 <span className="text-sm font-medium opacity-90">Exclusive Code</span>
@@ -150,14 +150,14 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
               <div className="coupon-border rounded-2xl p-6 mb-6 relative">
                 <p className="text-xs text-gray-500 uppercase tracking-widest font-bold mb-2">Your Coupon Code</p>
                 <div className="flex items-center justify-between gap-4">
-                  <code className="font-display font-black text-3xl text-[#FF8C00] tracking-wider select-all">
+                  <code className="font-display font-black text-3xl text-[#ee922c] tracking-wider select-all">
                     {deal.code}
                   </code>
                   <button
                     onClick={copyToClipboard}
                     className={`p-3 rounded-xl transition-all ${
                       copied 
-                        ? 'bg-[#228B22] text-white' 
+                        ? 'bg-[#3c7b48] text-white' 
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                     data-testid="copy-code-btn"
@@ -170,7 +170,7 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
               {/* Social Proof */}
               <div className="text-center mb-6">
                 <p className="text-sm text-gray-600">
-                  🔥 <span className="font-bold text-[#228B22]">93%</span> people saved money using this
+                  🔥 <span className="font-bold text-[#3c7b48]">93%</span> people saved money using this
                 </p>
               </div>
 
@@ -179,7 +179,7 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
                 <div className="text-center mb-4">
                   <div className="flex items-center justify-center gap-2 text-gray-600">
                     <Clock className="w-4 h-4 animate-pulse" />
-                    <span className="text-sm">Redirecting in <span className="font-bold text-[#FF8C00]">{countdown}</span> seconds...</span>
+                    <span className="text-sm">Redirecting in <span className="font-bold text-[#ee922c]">{countdown}</span> seconds...</span>
                   </div>
                 </div>
               ) : null}
@@ -187,7 +187,7 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
               {/* CTA Button */}
               <button
                 onClick={handleRedirect}
-                className="w-full bg-[#228B22] hover:bg-[#1D771D] text-white font-bold rounded-xl px-6 py-4 flex items-center justify-center gap-2 transition-all"
+                className="w-full bg-[#3c7b48] hover:bg-[#2d6339] text-white font-bold rounded-xl px-6 py-4 flex items-center justify-center gap-2 transition-all"
                 data-testid="go-to-store-btn"
               >
                 <ExternalLink className="w-5 h-5" />

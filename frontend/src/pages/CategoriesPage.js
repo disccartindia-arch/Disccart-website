@@ -43,7 +43,7 @@ export default function CategoriesPage() {
           className="mb-8"
         >
           <div className="flex items-center gap-2 mb-2">
-            <Tag className="w-8 h-8 text-[#FF8C00]" />
+            <Tag className="w-8 h-8 text-[#ee922c]" />
             <h1 className="font-display font-bold text-3xl text-gray-900">All Categories</h1>
           </div>
           <p className="text-gray-500">Browse deals by category</p>

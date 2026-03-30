@@ -62,7 +62,7 @@ export default function SeoPage() {
           className="mb-8"
         >
           <div className="flex items-center gap-2 mb-2">
-            <Tag className="w-8 h-8 text-[#FF8C00]" />
+            <Tag className="w-8 h-8 text-[#ee922c]" />
             <h1 className="font-display font-bold text-3xl text-gray-900">{pageData.title}</h1>
           </div>
           <p className="text-gray-500">{pageData.description}</p>
@@ -85,7 +85,7 @@ export default function SeoPage() {
         {pageData.faq && pageData.faq.length > 0 && (
           <section className="bg-gray-50 rounded-2xl p-8" data-testid="faq-section">
             <div className="flex items-center gap-2 mb-6">
-              <HelpCircle className="w-6 h-6 text-[#228B22]" />
+              <HelpCircle className="w-6 h-6 text-[#3c7b48]" />
               <h2 className="font-display font-bold text-2xl text-gray-900">Frequently Asked Questions</h2>
             </div>
             <div className="space-y-6">

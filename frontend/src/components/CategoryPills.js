@@ -47,8 +47,8 @@ export default function CategoryPills({ activeCategory = null }) {
         to="/"
         className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full font-medium text-sm transition-all ${
           !activeCategory 
-            ? 'bg-[#FF8C00] text-white' 
-            : 'bg-white border border-gray-200 text-gray-700 hover:border-[#FF8C00]'
+            ? 'bg-[#ee922c] text-white' 
+            : 'bg-white border border-gray-200 text-gray-700 hover:border-[#ee922c]'
         }`}
         data-testid="category-all"
       >
@@ -66,8 +66,8 @@ export default function CategoryPills({ activeCategory = null }) {
             to={`/category/${category.slug}`}
             className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-full font-medium text-sm transition-all ${
               isActive 
-                ? 'bg-[#FF8C00] text-white' 
-                : 'bg-white border border-gray-200 text-gray-700 hover:border-[#FF8C00]'
+                ? 'bg-[#ee922c] text-white' 
+                : 'bg-white border border-gray-200 text-gray-700 hover:border-[#ee922c]'
             }`}
             data-testid={`category-${category.slug}`}
           >

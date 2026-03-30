@@ -38,7 +38,7 @@ export default function TrendingPage() {
           className="mb-8"
         >
           <div className="flex items-center gap-2 mb-2">
-            <Flame className="w-8 h-8 text-[#FF8C00]" />
+            <Flame className="w-8 h-8 text-[#ee922c]" />
             <h1 className="font-display font-bold text-3xl text-gray-900">Trending Deals</h1>
           </div>
           <p className="text-gray-500">The hottest deals right now</p>

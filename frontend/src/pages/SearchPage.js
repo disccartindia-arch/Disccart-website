@@ -40,7 +40,7 @@ export default function SearchPage() {
           className="mb-8"
         >
           <div className="flex items-center gap-2 mb-2">
-            <Search className="w-8 h-8 text-[#FF8C00]" />
+            <Search className="w-8 h-8 text-[#ee922c]" />
             <h1 className="font-display font-bold text-3xl text-gray-900">
               Search Results
             </h1>

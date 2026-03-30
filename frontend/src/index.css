@@ -9,12 +9,12 @@
   --card: #FFFFFF;
   --overlay: rgba(0, 0, 0, 0.6);
   
-  --primary: #FF8C00;
-  --primary-hover: #E67E00;
+  --primary: #ee922c;
+  --primary-hover: #d9811f;
   --primary-foreground: #FFFFFF;
   
-  --secondary: #228B22;
-  --secondary-hover: #1D771D;
+  --secondary: #3c7b48;
+  --secondary-hover: #2d6339;
   --secondary-foreground: #FFFFFF;
   
   --text-primary: #0A0A0A;
@@ -22,11 +22,11 @@
   --text-muted: #9CA3AF;
   
   --border: #E5E7EB;
-  --border-focus: #FF8C00;
-  --border-dashed: rgba(255, 140, 0, 0.4);
+  --border-focus: #ee922c;
+  --border-dashed: rgba(238, 146, 44, 0.4);
   
-  --success: #228B22;
-  --warning: #F59E0B;
+  --success: #3c7b48;
+  --warning: #ee922c;
   --error: #EF4444;
   
   --radius: 0.75rem;

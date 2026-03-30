@@ -61,11 +61,11 @@ export default function HomePage() {
               Discover verified coupons and exclusive deals from top brands. Save big on every purchase!
             </p>
             <div className="flex flex-wrap justify-center gap-4">
-              <Link to="/trending" className="bg-[#FF8C00] hover:bg-[#E67E00] text-white font-bold rounded-xl px-6 py-3 flex items-center gap-2 transition-all shadow-lg shadow-orange-500/25" data-testid="explore-deals-btn">
+              <Link to="/trending" className="bg-[#ee922c] hover:bg-[#d9811f] text-white font-bold rounded-xl px-6 py-3 flex items-center gap-2 transition-all shadow-lg shadow-orange-500/25" data-testid="explore-deals-btn">
                 <Zap className="w-5 h-5" />
                 Explore Deals
               </Link>
-              <Link to="/categories" className="border-2 border-gray-200 hover:border-[#FF8C00] text-gray-900 font-bold rounded-xl px-6 py-3 flex items-center gap-2 transition-colors" data-testid="view-categories-btn">
+              <Link to="/categories" className="border-2 border-gray-200 hover:border-[#ee922c] text-gray-900 font-bold rounded-xl px-6 py-3 flex items-center gap-2 transition-colors" data-testid="view-categories-btn">
                 <Tag className="w-5 h-5" />
                 View Categories
               </Link>
@@ -87,10 +87,10 @@ export default function HomePage() {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-2">
-                <Zap className="w-6 h-6 text-[#FF8C00]" />
+                <Zap className="w-6 h-6 text-[#ee922c]" />
                 <h2 className="font-display font-bold text-2xl text-gray-900">Featured Deals</h2>
               </div>
-              <Link to="/trending" className="text-[#FF8C00] font-medium flex items-center gap-1 hover:gap-2 transition-all">
+              <Link to="/trending" className="text-[#ee922c] font-medium flex items-center gap-1 hover:gap-2 transition-all">
                 View All <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
@@ -112,7 +112,7 @@ export default function HomePage() {
       <section className="py-8" data-testid="categories-section">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-2 mb-6">
-            <Tag className="w-6 h-6 text-[#228B22]" />
+            <Tag className="w-6 h-6 text-[#3c7b48]" />
             <h2 className="font-display font-bold text-2xl text-gray-900">Shop by Category</h2>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -144,10 +144,10 @@ export default function HomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-2">
-              <TrendingUp className="w-6 h-6 text-[#228B22]" />
+              <TrendingUp className="w-6 h-6 text-[#3c7b48]" />
               <h2 className="font-display font-bold text-2xl text-gray-900">Trending Now</h2>
             </div>
-            <Link to="/trending" className="text-[#FF8C00] font-medium flex items-center gap-1 hover:gap-2 transition-all">
+            <Link to="/trending" className="text-[#ee922c] font-medium flex items-center gap-1 hover:gap-2 transition-all">
               See All <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
@@ -181,7 +181,7 @@ export default function HomePage() {
               <Link
                 key={slug}
                 to={`/deals/${slug}`}
-                className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm text-gray-600 hover:border-[#FF8C00] hover:text-[#FF8C00] transition-colors"
+                className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm text-gray-600 hover:border-[#ee922c] hover:text-[#ee922c] transition-colors"
               >
                 {slug.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
               </Link>

@@ -63,8 +63,8 @@ export default function SEO({
       <meta name="apple-mobile-web-app-title" content="DISCCART" />
       
       {/* Theme */}
-      <meta name="theme-color" content="#FF8C00" />
-      <meta name="msapplication-TileColor" content="#FF8C00" />
+      <meta name="theme-color" content="#ee922c" />
+      <meta name="msapplication-TileColor" content="#ee922c" />
     </Helmet>
   );
 }

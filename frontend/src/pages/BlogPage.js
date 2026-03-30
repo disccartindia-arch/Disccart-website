@@ -49,7 +49,7 @@ export default function BlogPage() {
             className="text-center"
           >
             <div className="inline-flex items-center gap-2 bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full mb-4">
-              <BookOpen className="w-5 h-5 text-[#FF8C00]" />
+              <BookOpen className="w-5 h-5 text-[#ee922c]" />
               <span className="font-medium text-gray-700">DISCCART Blog</span>
             </div>
             <h1 className="font-display font-black text-4xl md:text-5xl text-gray-900 mb-4">
@@ -93,11 +93,11 @@ export default function BlogPage() {
                     )}
                     <div className="p-6">
                       <div className="flex items-center gap-2 mb-3">
-                        <span className="bg-orange-100 text-[#FF8C00] text-xs font-bold px-2 py-1 rounded-full">
+                        <span className="bg-orange-100 text-[#ee922c] text-xs font-bold px-2 py-1 rounded-full">
                           {post.category}
                         </span>
                       </div>
-                      <h2 className="font-display font-bold text-xl text-gray-900 mb-2 group-hover:text-[#FF8C00] transition-colors line-clamp-2">
+                      <h2 className="font-display font-bold text-xl text-gray-900 mb-2 group-hover:text-[#ee922c] transition-colors line-clamp-2">
                         {post.title}
                       </h2>
                       <p className="text-gray-500 text-sm line-clamp-3 mb-4">
@@ -135,7 +135,7 @@ export default function BlogPage() {
             {['Saving Tips', 'Coupon Guides', 'Deal Strategies', 'Electronics', 'Fashion', 'Food'].map((topic) => (
               <span
                 key={topic}
-                className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm text-gray-600 hover:border-[#FF8C00] hover:text-[#FF8C00] transition-colors cursor-pointer"
+                className="px-4 py-2 bg-white border border-gray-200 rounded-full text-sm text-gray-600 hover:border-[#ee922c] hover:text-[#ee922c] transition-colors cursor-pointer"
               >
                 {topic}
               </span>

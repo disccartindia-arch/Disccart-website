@@ -7,7 +7,7 @@ import { ShareButtonsCompact } from './ShareButtons';
 function DealScoreBadge({ score }) {
   if (!score && score !== 0) return null;
   const rounded = Math.round(score);
-  const color = rounded >= 70 ? '#228B22' : rounded >= 40 ? '#FF8C00' : '#DC2626';
+  const color = rounded >= 70 ? '#3c7b48' : rounded >= 40 ? '#ee922c' : '#DC2626';
   const bg = rounded >= 70 ? 'bg-green-50 border-green-200' : rounded >= 40 ? 'bg-orange-50 border-orange-200' : 'bg-red-50 border-red-200';
   const label = rounded >= 70 ? 'Great' : rounded >= 40 ? 'Good' : 'Fair';
   const circumference = 2 * Math.PI * 16;
@@ -35,7 +35,7 @@ function DealScoreBadge({ score }) {
 function VerificationBadge({ status }) {
   if (status === 'verified') {
     return (
-      <div className="flex items-center gap-1 text-[#228B22] text-xs font-semibold" data-testid="verification-verified">
+      <div className="flex items-center gap-1 text-[#3c7b48] text-xs font-semibold" data-testid="verification-verified">
         <BadgeCheck className="w-4 h-4" />
         <span>Verified</span>
       </div>
@@ -83,7 +83,7 @@ export default function DealCard({ deal }) {
       >
         {/* Featured Badge */}
         {deal.is_featured && (
-          <div className="absolute top-3 left-3 z-10 bg-[#FF8C00] text-white text-xs font-bold px-2 py-1 rounded-full">
+          <div className="absolute top-3 left-3 z-10 bg-[#ee922c] text-white text-xs font-bold px-2 py-1 rounded-full">
             FEATURED
           </div>
         )}
@@ -99,12 +99,12 @@ export default function DealCard({ deal }) {
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-100 to-green-100">
-              <Tag className="w-12 h-12 text-[#FF8C00]" />
+              <Tag className="w-12 h-12 text-[#ee922c]" />
             </div>
           )}
           
           {/* Discount Badge */}
-          <div className="absolute top-2 right-2 bg-[#228B22] text-white font-black text-lg px-3 py-1 rounded-xl font-display shadow-lg">
+          <div className="absolute top-2 right-2 bg-[#3c7b48] text-white font-black text-lg px-3 py-1 rounded-xl font-display shadow-lg">
             {getDiscountDisplay()}
           </div>
         </div>
@@ -117,7 +117,7 @@ export default function DealCard({ deal }) {
 
         {/* Brand & Category */}
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-xs font-bold text-[#FF8C00] uppercase tracking-wide">{deal.brand_name}</span>
+          <span className="text-xs font-bold text-[#ee922c] uppercase tracking-wide">{deal.brand_name}</span>
           <span className="text-gray-300">·</span>
           <span className="text-xs text-gray-500">{deal.category_name}</span>
         </div>
@@ -137,7 +137,7 @@ export default function DealCard({ deal }) {
         {/* Price Display */}
         {deal.original_price && deal.discounted_price && (
           <div className="flex items-center gap-2 mb-3">
-            <span className="font-display font-black text-xl text-[#228B22]">
+            <span className="font-display font-black text-xl text-[#3c7b48]">
               ₹{deal.discounted_price.toLocaleString()}
             </span>
             <span className="text-sm text-gray-400 line-through">
@@ -149,7 +149,7 @@ export default function DealCard({ deal }) {
         {/* CTA Button */}
         <button
           onClick={() => setShowModal(true)}
-          className="mt-auto relative overflow-hidden bg-gradient-to-r from-[#FF8C00] to-[#E67E00] text-white font-bold rounded-xl px-6 py-4 w-full group/btn flex items-center justify-center gap-2 transition-all hover:shadow-lg hover:shadow-orange-500/25 active:scale-98"
+          className="mt-auto relative overflow-hidden bg-gradient-to-r from-[#ee922c] to-[#d9811f] text-white font-bold rounded-xl px-6 py-4 w-full group/btn flex items-center justify-center gap-2 transition-all hover:shadow-lg hover:shadow-orange-500/25 active:scale-98"
           data-testid={`reveal-btn-${deal.id}`}
         >
           {hasCode ? (

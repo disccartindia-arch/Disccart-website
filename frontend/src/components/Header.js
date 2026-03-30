@@ -35,14 +35,28 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 flex-shrink-0" data-testid="logo-link">
-            <img 
-              src="https://customer-assets.emergentagent.com/job_4782f2ef-8614-4604-843b-cc10ee1e98da/artifacts/a891hwo3_IMG_2239.png" 
-              alt="DISCCART" 
-              className="h-9 sm:h-10 md:h-12 w-auto"
-            />
-            <span className="font-display font-black text-xl sm:text-2xl md:text-3xl tracking-tight text-gray-900" data-testid="logo-text">
-              DISC<span className="text-[#FF8C00]">CART</span>
+          <Link to="/" className="flex items-center gap-2.5 flex-shrink-0" data-testid="logo-link">
+            {/* Basket Icon SVG */}
+            <svg viewBox="0 0 48 48" className="h-8 w-8 sm:h-9 sm:w-9 md:h-10 md:w-10 flex-shrink-0" data-testid="logo-icon">
+              {/* Handle */}
+              <path d="M14 18C14 12 18 6 24 6C30 6 34 12 34 18" fill="none" stroke="#ee922c" strokeWidth="3.5" strokeLinecap="round"/>
+              {/* Basket body */}
+              <rect x="8" y="18" width="32" height="24" rx="4" fill="#3c7b48"/>
+              {/* Basket rim */}
+              <rect x="6" y="16" width="36" height="5" rx="2.5" fill="#2d6339"/>
+              {/* Percentage symbol */}
+              <circle cx="18" cy="28" r="2.5" fill="#ee922c"/>
+              <circle cx="30" cy="36" r="2.5" fill="#ee922c"/>
+              <line x1="30" y1="26" x2="18" y2="38" stroke="#ee922c" strokeWidth="2.5" strokeLinecap="round"/>
+            </svg>
+            {/* Brand Text */}
+            <span className="font-display font-black text-xl sm:text-2xl md:text-3xl tracking-tight" data-testid="logo-text" style={{
+              background: 'linear-gradient(135deg, #3c7b48 0%, #2d9e4b 40%, #ee922c 70%, #e8751a 100%)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+              backgroundClip: 'text'
+            }}>
+              DISCCART
             </span>
           </Link>
 
@@ -55,7 +69,7 @@ export default function Header() {
                 placeholder="Search deals, coupons, brands..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-gray-100 rounded-full px-12 py-3 text-base focus:ring-2 focus:ring-[#FF8C00] outline-none transition-all"
+                className="w-full bg-gray-100 rounded-full px-12 py-3 text-base focus:ring-2 focus:ring-[#ee922c] outline-none transition-all"
                 data-testid="search-input"
               />
             </div>
@@ -63,19 +77,19 @@ export default function Header() {
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-4">
-            <Link to="/deals" className="text-gray-600 hover:text-[#FF8C00] font-medium transition-colors" data-testid="deals-link">
+            <Link to="/deals" className="text-gray-600 hover:text-[#ee922c] font-medium transition-colors" data-testid="deals-link">
               Deals
             </Link>
-            <Link to="/coupons" className="text-gray-600 hover:text-[#FF8C00] font-medium transition-colors" data-testid="coupons-link">
+            <Link to="/coupons" className="text-gray-600 hover:text-[#ee922c] font-medium transition-colors" data-testid="coupons-link">
               Coupons
             </Link>
-            <Link to="/categories" className="text-gray-600 hover:text-[#FF8C00] font-medium transition-colors" data-testid="categories-link">
+            <Link to="/categories" className="text-gray-600 hover:text-[#ee922c] font-medium transition-colors" data-testid="categories-link">
               Categories
             </Link>
-            <Link to="/deals/limited-time" className="text-gray-600 hover:text-[#FF8C00] font-medium transition-colors" data-testid="limited-link">
+            <Link to="/deals/limited-time" className="text-gray-600 hover:text-[#ee922c] font-medium transition-colors" data-testid="limited-link">
               Limited Time
             </Link>
-            <Link to="/blog" className="text-gray-600 hover:text-[#FF8C00] font-medium transition-colors" data-testid="blog-link">
+            <Link to="/blog" className="text-gray-600 hover:text-[#ee922c] font-medium transition-colors" data-testid="blog-link">
               Blog
             </Link>
             
@@ -104,7 +118,7 @@ export default function Header() {
               </DropdownMenu>
             ) : (
               <Link to="/login">
-                <Button className="bg-[#FF8C00] hover:bg-[#E67E00] text-white font-bold rounded-xl px-6" data-testid="login-btn">
+                <Button className="bg-[#ee922c] hover:bg-[#d9811f] text-white font-bold rounded-xl px-6" data-testid="login-btn">
                   Login
                 </Button>
               </Link>
@@ -130,7 +144,7 @@ export default function Header() {
               placeholder="Search deals..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-gray-100 rounded-full px-12 py-3 text-base focus:ring-2 focus:ring-[#FF8C00] outline-none"
+              className="w-full bg-gray-100 rounded-full px-12 py-3 text-base focus:ring-2 focus:ring-[#ee922c] outline-none"
               data-testid="mobile-search-input"
             />
           </div>
@@ -142,35 +156,35 @@ export default function Header() {
             <nav className="flex flex-col gap-4">
               <Link 
                 to="/deals" 
-                className="text-gray-600 hover:text-[#FF8C00] font-medium py-2"
+                className="text-gray-600 hover:text-[#ee922c] font-medium py-2"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Deals
               </Link>
               <Link 
                 to="/coupons" 
-                className="text-gray-600 hover:text-[#FF8C00] font-medium py-2"
+                className="text-gray-600 hover:text-[#ee922c] font-medium py-2"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Coupons
               </Link>
               <Link 
                 to="/categories" 
-                className="text-gray-600 hover:text-[#FF8C00] font-medium py-2"
+                className="text-gray-600 hover:text-[#ee922c] font-medium py-2"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Categories
               </Link>
               <Link 
                 to="/deals/limited-time" 
-                className="text-gray-600 hover:text-[#FF8C00] font-medium py-2"
+                className="text-gray-600 hover:text-[#ee922c] font-medium py-2"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Limited Time
               </Link>
               <Link 
                 to="/blog" 
-                className="text-gray-600 hover:text-[#FF8C00] font-medium py-2"
+                className="text-gray-600 hover:text-[#ee922c] font-medium py-2"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Blog
@@ -180,7 +194,7 @@ export default function Header() {
                   {isAdmin && (
                     <Link 
                       to="/admin" 
-                      className="text-gray-600 hover:text-[#FF8C00] font-medium py-2"
+                      className="text-gray-600 hover:text-[#ee922c] font-medium py-2"
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       Admin Panel
@@ -188,7 +202,7 @@ export default function Header() {
                   )}
                   <button 
                     onClick={() => { handleLogout(); setMobileMenuOpen(false); }}
-                    className="text-left text-gray-600 hover:text-[#FF8C00] font-medium py-2"
+                    className="text-left text-gray-600 hover:text-[#ee922c] font-medium py-2"
                   >
                     Logout
                   </button>
@@ -196,7 +210,7 @@ export default function Header() {
               ) : (
                 <Link 
                   to="/login" 
-                  className="text-[#FF8C00] font-bold py-2"
+                  className="text-[#ee922c] font-bold py-2"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Login / Register

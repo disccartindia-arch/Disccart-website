@@ -38,7 +38,7 @@ export default function BlogPostPage() {
   if (loading) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-[#FF8C00] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-[#ee922c] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -47,7 +47,7 @@ export default function BlogPostPage() {
     return (
       <div className="min-h-[50vh] flex flex-col items-center justify-center">
         <p className="text-gray-500 text-lg mb-4">Post not found</p>
-        <Link to="/blog" className="text-[#FF8C00] font-medium hover:underline">
+        <Link to="/blog" className="text-[#ee922c] font-medium hover:underline">
           ← Back to Blog
         </Link>
       </div>
@@ -68,7 +68,7 @@ export default function BlogPostPage() {
         {/* Back Link */}
         <Link 
           to="/blog" 
-          className="inline-flex items-center gap-2 text-gray-500 hover:text-[#FF8C00] mb-8 transition-colors"
+          className="inline-flex items-center gap-2 text-gray-500 hover:text-[#ee922c] mb-8 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Blog
@@ -81,7 +81,7 @@ export default function BlogPostPage() {
           className="mb-8"
         >
           <div className="flex items-center gap-3 mb-4">
-            <span className="bg-orange-100 text-[#FF8C00] text-sm font-bold px-3 py-1 rounded-full">
+            <span className="bg-orange-100 text-[#ee922c] text-sm font-bold px-3 py-1 rounded-full">
               {post.category}
             </span>
             <div className="flex items-center gap-1 text-sm text-gray-400">
@@ -123,7 +123,7 @@ export default function BlogPostPage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className="prose prose-lg max-w-none prose-headings:font-display prose-headings:text-gray-900 prose-a:text-[#FF8C00] prose-a:no-underline hover:prose-a:underline"
+          className="prose prose-lg max-w-none prose-headings:font-display prose-headings:text-gray-900 prose-a:text-[#ee922c] prose-a:no-underline hover:prose-a:underline"
         >
           <ReactMarkdown>{post.content}</ReactMarkdown>
         </motion.div>

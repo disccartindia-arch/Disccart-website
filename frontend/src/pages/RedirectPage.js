@@ -38,14 +38,14 @@ export default function RedirectPage() {
     return (
       <div className="min-h-[60vh] flex flex-col items-center justify-center" data-testid="redirect-error">
         <p className="text-gray-500 text-lg mb-4">{error}</p>
-        <a href="/" className="text-[#FF8C00] font-medium hover:underline">Go to Home</a>
+        <a href="/" className="text-[#ee922c] font-medium hover:underline">Go to Home</a>
       </div>
     );
   }
 
   return (
     <div className="min-h-[60vh] flex flex-col items-center justify-center" data-testid="redirect-page">
-      <Loader2 className="w-8 h-8 text-[#FF8C00] animate-spin mb-4" />
+      <Loader2 className="w-8 h-8 text-[#ee922c] animate-spin mb-4" />
       <p className="text-gray-500">Redirecting you to the deal...</p>
     </div>
   );

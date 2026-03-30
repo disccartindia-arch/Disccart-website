@@ -89,7 +89,7 @@ export default function AdminPage() {
   if (authLoading) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-[#FF8C00] animate-spin" />
+        <Loader2 className="w-8 h-8 text-[#ee922c] animate-spin" />
       </div>
     );
   }
@@ -160,7 +160,7 @@ export default function AdminPage() {
               key={id}
               onClick={() => setActiveTab(id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm whitespace-nowrap transition-all ${
-                activeTab === id ? 'bg-[#FF8C00] text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-[#FF8C00]'
+                activeTab === id ? 'bg-[#ee922c] text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-[#ee922c]'
               }`}
               data-testid={`tab-${id}`}
             >
@@ -192,7 +192,7 @@ export default function AdminPage() {
                   <div className="space-y-3">
                     {analytics.top_brands.map((brand, i) => (
                       <div key={brand.name} className="flex items-center gap-4">
-                        <span className="w-6 h-6 rounded-full bg-orange-100 text-[#FF8C00] text-xs font-bold flex items-center justify-center">{i + 1}</span>
+                        <span className="w-6 h-6 rounded-full bg-orange-100 text-[#ee922c] text-xs font-bold flex items-center justify-center">{i + 1}</span>
                         <span className="flex-1">{brand.name}</span>
                         <span className="text-gray-500">{brand.clicks} clicks</span>
                       </div>
@@ -207,7 +207,7 @@ export default function AdminPage() {
                   <div className="space-y-3">
                     {analytics.top_links.map((link, i) => (
                       <div key={link.slug} className="flex items-center gap-4">
-                        <span className="w-6 h-6 rounded-full bg-green-100 text-[#228B22] text-xs font-bold flex items-center justify-center">{i + 1}</span>
+                        <span className="w-6 h-6 rounded-full bg-green-100 text-[#3c7b48] text-xs font-bold flex items-center justify-center">{i + 1}</span>
                         <span className="flex-1">/go/{link.slug}</span>
                         <span className="text-gray-500">{link.clicks} clicks</span>
                       </div>
@@ -262,10 +262,10 @@ export default function AdminPage() {
             title="Pretty Links (Affiliate URLs)"
             data={prettyLinks}
             columns={[
-              { key: 'slug', label: 'Short URL', render: (v) => <code className="text-[#FF8C00]">/go/{v}</code> },
+              { key: 'slug', label: 'Short URL', render: (v) => <code className="text-[#ee922c]">/go/{v}</code> },
               { key: 'title', label: 'Title' },
               { key: 'destination_url', label: 'Destination', render: (v) => <span className="truncate max-w-[200px] block text-sm text-gray-500">{v}</span> },
-              { key: 'clicks', label: 'Clicks', render: (v) => <span className="font-bold text-[#228B22]">{v}</span> },
+              { key: 'clicks', label: 'Clicks', render: (v) => <span className="font-bold text-[#3c7b48]">{v}</span> },
               { key: 'is_active', label: 'Status', render: (v) => v ? <span className="text-green-600">Active</span> : <span className="text-gray-400">Inactive</span> }
             ]}
             onAdd={() => { setEditingItem(null); setShowLinkDialog(true); }}
@@ -330,12 +330,12 @@ export default function AdminPage() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-2xl mx-auto">
             <div className="bg-white rounded-xl border border-gray-200 p-8">
               <div className="text-center mb-8">
-                <FileSpreadsheet className="w-16 h-16 text-[#FF8C00] mx-auto mb-4" />
+                <FileSpreadsheet className="w-16 h-16 text-[#ee922c] mx-auto mb-4" />
                 <h2 className="font-display font-bold text-2xl mb-2">Bulk Upload Coupons</h2>
                 <p className="text-gray-500">Upload a CSV file to add multiple coupons</p>
               </div>
               <div
-                className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:border-[#FF8C00] transition-colors cursor-pointer"
+                className="border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:border-[#ee922c] transition-colors cursor-pointer"
                 onClick={() => fileInputRef.current?.click()}
               >
                 <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
@@ -375,8 +375,8 @@ export default function AdminPage() {
 function StatCard({ title, value, color = 'default' }) {
   const colors = {
     default: 'text-gray-900',
-    green: 'text-[#228B22]',
-    orange: 'text-[#FF8C00]'
+    green: 'text-[#3c7b48]',
+    orange: 'text-[#ee922c]'
   };
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6">
@@ -392,7 +392,7 @@ function DataTable({ title, data, columns, onAdd, onEdit, onDelete, loading, ext
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
       <div className="flex justify-between items-center">
         <h2 className="font-display font-bold text-xl">{title}</h2>
-        <Button onClick={onAdd} className="bg-[#FF8C00] hover:bg-[#E67E00]">
+        <Button onClick={onAdd} className="bg-[#ee922c] hover:bg-[#d9811f]">
           <Plus className="w-4 h-4 mr-2" /> Add New
         </Button>
       </div>
@@ -480,7 +480,7 @@ function CouponDialog({ open, onOpenChange, item, categories, onSuccess }) {
           </div>
           <div className="flex gap-3 pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">Cancel</Button>
-            <Button type="submit" disabled={loading} className="flex-1 bg-[#FF8C00]">{loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}</Button>
+            <Button type="submit" disabled={loading} className="flex-1 bg-[#ee922c]">{loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}</Button>
           </div>
         </form>
       </DialogContent>
@@ -523,7 +523,7 @@ function CategoryDialog({ open, onOpenChange, item, onSuccess }) {
           <div><Label>Image URL</Label><Input value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value })} /></div>
           <div className="flex gap-3 pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">Cancel</Button>
-            <Button type="submit" disabled={loading} className="flex-1 bg-[#FF8C00]">{loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}</Button>
+            <Button type="submit" disabled={loading} className="flex-1 bg-[#ee922c]">{loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}</Button>
           </div>
         </form>
       </DialogContent>
@@ -567,7 +567,7 @@ function PrettyLinkDialog({ open, onOpenChange, item, onSuccess }) {
           <div className="flex items-center gap-2"><input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} /><Label className="mb-0">Active</Label></div>
           <div className="flex gap-3 pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">Cancel</Button>
-            <Button type="submit" disabled={loading} className="flex-1 bg-[#FF8C00]">{loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}</Button>
+            <Button type="submit" disabled={loading} className="flex-1 bg-[#ee922c]">{loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}</Button>
           </div>
         </form>
       </DialogContent>
@@ -613,7 +613,7 @@ function PageDialog({ open, onOpenChange, item, onSuccess }) {
           <div className="flex items-center gap-2"><input type="checkbox" checked={form.is_published} onChange={(e) => setForm({ ...form, is_published: e.target.checked })} /><Label className="mb-0">Published</Label></div>
           <div className="flex gap-3 pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">Cancel</Button>
-            <Button type="submit" disabled={loading} className="flex-1 bg-[#FF8C00]">{loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}</Button>
+            <Button type="submit" disabled={loading} className="flex-1 bg-[#ee922c]">{loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}</Button>
           </div>
         </form>
       </DialogContent>
@@ -674,7 +674,7 @@ function BlogDialog({ open, onOpenChange, item, onSuccess }) {
           <div className="flex items-center gap-2"><input type="checkbox" checked={form.is_published} onChange={(e) => setForm({ ...form, is_published: e.target.checked })} /><Label className="mb-0">Published</Label></div>
           <div className="flex gap-3 pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="flex-1">Cancel</Button>
-            <Button type="submit" disabled={loading} className="flex-1 bg-[#FF8C00]">{loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}</Button>
+            <Button type="submit" disabled={loading} className="flex-1 bg-[#ee922c]">{loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save'}</Button>
           </div>
         </form>
       </DialogContent>

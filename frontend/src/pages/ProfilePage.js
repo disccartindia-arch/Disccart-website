@@ -9,7 +9,7 @@ export default function ProfilePage() {
   if (loading) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-[#FF8C00] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-[#ee922c] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -27,7 +27,7 @@ export default function ProfilePage() {
           className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden"
         >
           {/* Header */}
-          <div className="bg-gradient-to-r from-[#FF8C00] to-[#E67E00] p-8 text-white text-center">
+          <div className="bg-gradient-to-r from-[#ee922c] to-[#d9811f] p-8 text-white text-center">
             <div className="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <User className="w-10 h-10" />
             </div>

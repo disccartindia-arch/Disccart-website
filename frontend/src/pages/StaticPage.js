@@ -30,7 +30,7 @@ export default function StaticPage() {
   if (loading) {
     return (
       <div className="min-h-[50vh] flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-[#FF8C00] border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-[#ee922c] border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -39,7 +39,7 @@ export default function StaticPage() {
     return (
       <div className="min-h-[50vh] flex flex-col items-center justify-center">
         <p className="text-gray-500 text-lg mb-4">Page not found</p>
-        <Link to="/" className="text-[#FF8C00] font-medium hover:underline">
+        <Link to="/" className="text-[#ee922c] font-medium hover:underline">
           ← Back to Home
         </Link>
       </div>
@@ -65,7 +65,7 @@ export default function StaticPage() {
           <h1 className="font-display font-black text-3xl md:text-4xl text-gray-900 mb-4">
             {page.title}
           </h1>
-          <div className="w-24 h-1 bg-gradient-to-r from-[#FF8C00] to-[#228B22] mx-auto rounded-full" />
+          <div className="w-24 h-1 bg-gradient-to-r from-[#ee922c] to-[#3c7b48] mx-auto rounded-full" />
         </motion.header>
 
         {/* Content */}
@@ -73,7 +73,7 @@ export default function StaticPage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
-          className="prose prose-lg max-w-none prose-headings:font-display prose-headings:text-gray-900 prose-a:text-[#FF8C00] prose-a:no-underline hover:prose-a:underline prose-strong:text-gray-900"
+          className="prose prose-lg max-w-none prose-headings:font-display prose-headings:text-gray-900 prose-a:text-[#ee922c] prose-a:no-underline hover:prose-a:underline prose-strong:text-gray-900"
         >
           <ReactMarkdown>{page.content}</ReactMarkdown>
         </motion.div>
@@ -90,7 +90,7 @@ export default function StaticPage() {
               href="mailto:disccartindia@gmail.com"
               className="flex items-center gap-4 p-6 bg-orange-50 rounded-2xl hover:bg-orange-100 transition-colors"
             >
-              <div className="w-12 h-12 bg-[#FF8C00] rounded-full flex items-center justify-center">
+              <div className="w-12 h-12 bg-[#ee922c] rounded-full flex items-center justify-center">
                 <Mail className="w-6 h-6 text-white" />
               </div>
               <div>
@@ -102,7 +102,7 @@ export default function StaticPage() {
               href="tel:+919111036751"
               className="flex items-center gap-4 p-6 bg-green-50 rounded-2xl hover:bg-green-100 transition-colors"
             >
-              <div className="w-12 h-12 bg-[#228B22] rounded-full flex items-center justify-center">
+              <div className="w-12 h-12 bg-[#3c7b48] rounded-full flex items-center justify-center">
                 <Phone className="w-6 h-6 text-white" />
               </div>
               <div>

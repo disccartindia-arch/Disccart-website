@@ -57,21 +57,21 @@ export default function DealsPage() {
           <div className="flex gap-3 overflow-x-auto hide-scrollbar">
             <Link
               to="/deals"
-              className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-[#FF8C00] text-white rounded-full font-medium text-sm"
+              className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-[#ee922c] text-white rounded-full font-medium text-sm"
             >
               <Tag className="w-4 h-4" />
               All Deals
             </Link>
             <Link
               to="/deals/limited-time"
-              className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-full font-medium text-sm hover:border-[#FF8C00]"
+              className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-full font-medium text-sm hover:border-[#ee922c]"
             >
               <Clock className="w-4 h-4" />
               Limited Time
             </Link>
             <Link
               to="/trending"
-              className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-full font-medium text-sm hover:border-[#FF8C00]"
+              className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-gray-700 rounded-full font-medium text-sm hover:border-[#ee922c]"
             >
               <Zap className="w-4 h-4" />
               Trending
