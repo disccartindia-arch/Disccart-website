@@ -39,8 +39,11 @@ export default function Header() {
             <img 
               src="https://customer-assets.emergentagent.com/job_4782f2ef-8614-4604-843b-cc10ee1e98da/artifacts/a891hwo3_IMG_2239.png" 
               alt="DISCCART" 
-              className="h-10 sm:h-12 md:h-14 lg:h-16 w-auto"
+              className="h-9 sm:h-10 md:h-12 w-auto"
             />
+            <span className="font-display font-black text-xl sm:text-2xl md:text-3xl tracking-tight text-gray-900" data-testid="logo-text">
+              DISC<span className="text-[#FF8C00]">CART</span>
+            </span>
           </Link>
 
           {/* Desktop Search */}
