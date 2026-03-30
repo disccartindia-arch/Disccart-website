@@ -35,11 +35,11 @@ export default function Header() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2" data-testid="logo-link">
+          <Link to="/" className="flex items-center gap-2 flex-shrink-0" data-testid="logo-link">
             <img 
               src="https://customer-assets.emergentagent.com/job_4782f2ef-8614-4604-843b-cc10ee1e98da/artifacts/a891hwo3_IMG_2239.png" 
               alt="DISCCART" 
-              className="h-10 md:h-12 w-auto"
+              className="h-10 sm:h-12 md:h-14 lg:h-16 w-auto"
             />
           </Link>
 
@@ -62,6 +62,9 @@ export default function Header() {
           <nav className="hidden md:flex items-center gap-4">
             <Link to="/deals" className="text-gray-600 hover:text-[#FF8C00] font-medium transition-colors" data-testid="deals-link">
               Deals
+            </Link>
+            <Link to="/coupons" className="text-gray-600 hover:text-[#FF8C00] font-medium transition-colors" data-testid="coupons-link">
+              Coupons
             </Link>
             <Link to="/categories" className="text-gray-600 hover:text-[#FF8C00] font-medium transition-colors" data-testid="categories-link">
               Categories
@@ -140,6 +143,13 @@ export default function Header() {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Deals
+              </Link>
+              <Link 
+                to="/coupons" 
+                className="text-gray-600 hover:text-[#FF8C00] font-medium py-2"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Coupons
               </Link>
               <Link 
                 to="/categories" 

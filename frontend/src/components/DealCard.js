@@ -1,8 +1,61 @@
 import { useState } from 'react';
-import { BadgeCheck, Copy, ExternalLink, Clock, Tag } from 'lucide-react';
+import { BadgeCheck, Copy, ExternalLink, Clock, Tag, ShieldAlert, ShieldX, TrendingUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 import CouponRevealModal from './CouponRevealModal';
 import { ShareButtonsCompact } from './ShareButtons';
+
+function DealScoreBadge({ score }) {
+  if (!score && score !== 0) return null;
+  const rounded = Math.round(score);
+  const color = rounded >= 70 ? '#228B22' : rounded >= 40 ? '#FF8C00' : '#DC2626';
+  const bg = rounded >= 70 ? 'bg-green-50 border-green-200' : rounded >= 40 ? 'bg-orange-50 border-orange-200' : 'bg-red-50 border-red-200';
+  const label = rounded >= 70 ? 'Great' : rounded >= 40 ? 'Good' : 'Fair';
+  const circumference = 2 * Math.PI * 16;
+  const offset = circumference - (rounded / 100) * circumference;
+
+  return (
+    <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg border ${bg}`} data-testid="deal-score-badge">
+      <svg width="28" height="28" viewBox="0 0 36 36" className="flex-shrink-0">
+        <circle cx="18" cy="18" r="16" fill="none" stroke="#e5e7eb" strokeWidth="3" />
+        <circle
+          cx="18" cy="18" r="16" fill="none"
+          stroke={color} strokeWidth="3" strokeLinecap="round"
+          strokeDasharray={circumference} strokeDashoffset={offset}
+          transform="rotate(-90 18 18)"
+        />
+        <text x="18" y="18" textAnchor="middle" dominantBaseline="central" fontSize="10" fontWeight="800" fill={color}>
+          {rounded}
+        </text>
+      </svg>
+      <span className="text-xs font-bold" style={{ color }}>{label}</span>
+    </div>
+  );
+}
+
+function VerificationBadge({ status }) {
+  if (status === 'verified') {
+    return (
+      <div className="flex items-center gap-1 text-[#228B22] text-xs font-semibold" data-testid="verification-verified">
+        <BadgeCheck className="w-4 h-4" />
+        <span>Verified</span>
+      </div>
+    );
+  }
+  if (status === 'expired') {
+    return (
+      <div className="flex items-center gap-1 text-amber-600 text-xs font-semibold" data-testid="verification-expired">
+        <ShieldAlert className="w-4 h-4" />
+        <span>Possibly Expired</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-1 text-gray-400 text-xs font-semibold" data-testid="verification-unverified">
+      <ShieldX className="w-4 h-4" />
+      <span>Unverified</span>
+    </div>
+  );
+}
 
 export default function DealCard({ deal }) {
   const [showModal, setShowModal] = useState(false);
@@ -56,10 +109,16 @@ export default function DealCard({ deal }) {
           </div>
         </div>
 
+        {/* Score + Verification Row */}
+        <div className="flex items-center justify-between mb-2">
+          <DealScoreBadge score={deal.deal_score} />
+          <VerificationBadge status={deal.verification_status || (deal.is_verified ? 'verified' : 'unverified')} />
+        </div>
+
         {/* Brand & Category */}
         <div className="flex items-center gap-2 mb-2">
           <span className="text-xs font-bold text-[#FF8C00] uppercase tracking-wide">{deal.brand_name}</span>
-          <span className="text-gray-300">•</span>
+          <span className="text-gray-300">·</span>
           <span className="text-xs text-gray-500">{deal.category_name}</span>
         </div>
 
@@ -87,14 +146,6 @@ export default function DealCard({ deal }) {
           </div>
         )}
 
-        {/* Verified Badge */}
-        {deal.is_verified && (
-          <div className="flex items-center gap-1 text-[#228B22] text-xs font-medium mb-3">
-            <BadgeCheck className="w-4 h-4" />
-            <span>Verified</span>
-          </div>
-        )}
-
         {/* CTA Button */}
         <button
           onClick={() => setShowModal(true)}
@@ -117,8 +168,8 @@ export default function DealCard({ deal }) {
         {/* Clicks indicator */}
         {deal.clicks > 0 && (
           <div className="mt-2 text-center">
-            <span className="text-xs text-gray-400">
-              🔥 {deal.clicks.toLocaleString()} people used this
+            <span className="text-xs text-gray-400 flex items-center justify-center gap-1">
+              <TrendingUp className="w-3 h-3" /> {deal.clicks.toLocaleString()} people used this
             </span>
           </div>
         )}
@@ -141,3 +192,5 @@ export default function DealCard({ deal }) {
     </>
   );
 }
+
+export { DealScoreBadge, VerificationBadge };

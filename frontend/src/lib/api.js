@@ -134,6 +134,12 @@ export const generateAIContent = async (contentData) => {
   return data;
 };
 
+// Coupons Only (with codes)
+export const getCouponsOnly = async (params = {}) => {
+  const { data } = await api.get('/coupons-only', { params });
+  return data;
+};
+
 // Pretty Links
 export const getPrettyLinks = async () => {
   const { data } = await api.get('/pretty-links');

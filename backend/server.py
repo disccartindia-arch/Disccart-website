@@ -303,6 +303,7 @@ class CouponResponse(BaseModel):
     clicks: int = 0
     created_at: datetime
     deal_score: Optional[float] = None
+    verification_status: Optional[str] = "verified"
 
 # Click tracking
 class ClickCreate(BaseModel):
@@ -650,6 +651,53 @@ async def get_coupons(
         }}
     ]
     coupons = await db.coupons.aggregate(pipeline).to_list(limit)
+    # Add verification status to each coupon
+    for c in coupons:
+        c["verification_status"] = get_verification_status(c)
+    return coupons
+
+@api_router.get("/coupons-only", response_model=List[CouponResponse])
+async def get_coupons_only(
+    category: Optional[str] = None,
+    search: Optional[str] = None,
+    sort_by: str = "popular",
+    limit: int = 50,
+    skip: int = 0
+):
+    """Get only coupons that have a code (not deals without codes)"""
+    query = {"is_active": True, "code": {"$nin": [None, ""]}}
+    if category:
+        query["category_name"] = {"$regex": category, "$options": "i"}
+    if search:
+        query["$or"] = [
+            {"title": {"$regex": search, "$options": "i"}},
+            {"description": {"$regex": search, "$options": "i"}},
+            {"brand_name": {"$regex": search, "$options": "i"}},
+            {"code": {"$regex": search, "$options": "i"}},
+            {"tags": {"$in": [search.lower()]}}
+        ]
+
+    sort_field = {"popular": {"deal_score": -1, "clicks": -1}, "latest": {"created_at": -1}}
+    sort_order = sort_field.get(sort_by, sort_field["popular"])
+
+    pipeline = [
+        {"$match": query},
+        {"$sort": sort_order},
+        {"$skip": skip},
+        {"$limit": limit},
+        {"$project": {
+            "_id": 0,
+            "id": {"$toString": "$_id"},
+            "title": 1, "description": 1, "code": 1, "discount_type": 1,
+            "discount_value": 1, "brand_name": 1, "category_name": 1,
+            "original_price": 1, "discounted_price": 1, "affiliate_url": 1,
+            "image_url": 1, "expires_at": 1, "is_featured": 1, "is_verified": 1,
+            "is_active": 1, "tags": 1, "clicks": 1, "created_at": 1, "deal_score": 1
+        }}
+    ]
+    coupons = await db.coupons.aggregate(pipeline).to_list(limit)
+    for c in coupons:
+        c["verification_status"] = get_verification_status(c)
     return coupons
 
 @api_router.get("/coupons/{coupon_id}", response_model=CouponResponse)
@@ -662,6 +710,7 @@ async def get_coupon(coupon_id: str):
     if not coupon:
         raise HTTPException(status_code=404, detail="Coupon not found")
     coupon["id"] = coupon_id
+    coupon["verification_status"] = get_verification_status(coupon)
     return coupon
 
 @api_router.post("/coupons", response_model=CouponResponse)
@@ -700,29 +749,83 @@ async def delete_coupon(coupon_id: str, request: Request):
     return {"message": "Coupon deleted"}
 
 def calculate_deal_score(coupon: dict) -> float:
-    """Calculate a deal score based on various factors"""
-    score = 50.0  # Base score
-    
-    # Discount value bonus
-    if coupon.get("discount_value"):
-        if coupon["discount_type"] == "percentage":
-            score += min(coupon["discount_value"], 50)  # Max 50 points for % discount
-        else:
-            score += min(coupon["discount_value"] / 100, 30)  # Flat discount
-    
-    # Verified bonus
+    """Calculate an AI-based deal score (0-100) considering multiple factors"""
+    score = 0.0
+
+    # 1. Discount depth (0-35 pts)
+    dv = coupon.get("discount_value") or 0
+    if coupon.get("discount_type") == "percentage":
+        score += min(dv * 0.7, 35)  # 50% off = 35 pts
+    elif coupon.get("discount_type") == "flat" and coupon.get("original_price"):
+        pct = (dv / coupon["original_price"]) * 100
+        score += min(pct * 0.7, 35)
+    elif dv:
+        score += min(dv / 50, 20)
+
+    # 2. Price advantage (0-20 pts)
+    op = coupon.get("original_price") or 0
+    dp = coupon.get("discounted_price") or 0
+    if op > 0 and dp > 0 and op > dp:
+        savings_pct = ((op - dp) / op) * 100
+        score += min(savings_pct * 0.4, 20)
+
+    # 3. Popularity / trending (0-15 pts)
+    clicks = coupon.get("clicks") or 0
+    if clicks >= 100:
+        score += 15
+    elif clicks >= 50:
+        score += 12
+    elif clicks >= 20:
+        score += 8
+    elif clicks >= 5:
+        score += 4
+
+    # 4. Verification & trust (0-15 pts)
     if coupon.get("is_verified"):
         score += 10
-    
-    # Featured bonus
-    if coupon.get("is_featured"):
-        score += 15
-    
-    # Has code bonus
     if coupon.get("code"):
         score += 5
-    
-    return min(score, 100)  # Cap at 100
+
+    # 5. Freshness & featured (0-15 pts)
+    if coupon.get("is_featured"):
+        score += 10
+    # Freshness: newer deals get bonus
+    created = coupon.get("created_at")
+    if created:
+        try:
+            if isinstance(created, datetime):
+                if created.tzinfo is None:
+                    from datetime import timezone as tz
+                    created = created.replace(tzinfo=tz.utc)
+                age_days = (datetime.now(timezone.utc) - created).days
+            else:
+                age_days = 30
+        except Exception:
+            age_days = 30
+        if age_days <= 1:
+            score += 5
+        elif age_days <= 7:
+            score += 3
+        elif age_days <= 14:
+            score += 1
+
+    return round(min(score, 100), 1)
+
+
+def get_verification_status(coupon: dict) -> str:
+    """Determine coupon verification status based on expiry and flags"""
+    if not coupon.get("is_verified", False):
+        return "unverified"
+    expires = coupon.get("expires_at")
+    if expires:
+        if isinstance(expires, str):
+            try:
+                expires = datetime.fromisoformat(expires.replace("Z", "+00:00"))
+            except Exception:
+                expires = None
+        if expires and expires < datetime.now(timezone.utc):
+            return "expired"
+    return "verified"
 
 # ===================== CLICK TRACKING =====================
 
@@ -1407,7 +1510,20 @@ async def startup_event():
     # Seed initial data
     await seed_initial_data()
     
+    # Recalculate deal scores with enhanced algorithm
+    await recalculate_deal_scores()
+    
     logger.info("DISCCART API started successfully")
+
+async def recalculate_deal_scores():
+    """Recalculate all deal scores with the enhanced algorithm"""
+    async for coupon in db.coupons.find({}):
+        new_score = calculate_deal_score(coupon)
+        if coupon.get("deal_score") != new_score:
+            await db.coupons.update_one(
+                {"_id": coupon["_id"]},
+                {"$set": {"deal_score": new_score}}
+            )
 
 async def seed_admin():
     admin_email = os.environ.get("ADMIN_EMAIL", "disccartindia@gmail.com")
@@ -1434,16 +1550,16 @@ async def seed_admin():
     # Write credentials
     Path("/app/memory").mkdir(exist_ok=True)
     with open("/app/memory/test_credentials.md", "w") as f:
-        f.write(f"# Test Credentials\n\n")
-        f.write(f"## Admin Account\n")
+        f.write("# Test Credentials\n\n")
+        f.write("## Admin Account\n")
         f.write(f"- Email: {admin_email}\n")
         f.write(f"- Password: {admin_password}\n")
-        f.write(f"- Role: admin\n\n")
-        f.write(f"## Auth Endpoints\n")
-        f.write(f"- POST /api/auth/register\n")
-        f.write(f"- POST /api/auth/login\n")
-        f.write(f"- POST /api/auth/logout\n")
-        f.write(f"- GET /api/auth/me\n")
+        f.write("- Role: admin\n\n")
+        f.write("## Auth Endpoints\n")
+        f.write("- POST /api/auth/register\n")
+        f.write("- POST /api/auth/login\n")
+        f.write("- POST /api/auth/logout\n")
+        f.write("- GET /api/auth/me\n")
 
 async def seed_initial_data():
     """Seed initial categories and sample coupons"""

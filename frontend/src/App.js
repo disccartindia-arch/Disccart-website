@@ -29,6 +29,7 @@ import SearchPage from "./pages/SearchPage";
 import SeoPage from "./pages/SeoPage";
 import ProfilePage from "./pages/ProfilePage";
 import AdminPage from "./pages/AdminPage";
+import CouponsPage from "./pages/CouponsPage";
 import BlogPage from "./pages/BlogPage";
 import BlogPostPage from "./pages/BlogPostPage";
 import StaticPage from "./pages/StaticPage";
@@ -57,6 +58,7 @@ function App() {
                 <Route path="/deals/:pageType" element={<SeoPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/admin" element={<AdminPage />} />
+                <Route path="/coupons" element={<CouponsPage />} />
                 <Route path="/blog" element={<BlogPage />} />
                 <Route path="/blog/:slug" element={<BlogPostPage />} />
                 <Route path="/page/:slug" element={<StaticPage />} />

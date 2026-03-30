@@ -1,9 +1,10 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Grid3X3, TrendingUp, User } from 'lucide-react';
+import { Home, Grid3X3, TrendingUp, User, Ticket } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const navItems = [
   { path: '/', icon: Home, label: 'Home' },
+  { path: '/coupons', icon: Ticket, label: 'Coupons' },
   { path: '/categories', icon: Grid3X3, label: 'Categories' },
   { path: '/trending', icon: TrendingUp, label: 'Trending' },
   { path: '/profile', icon: User, label: 'Profile' }
