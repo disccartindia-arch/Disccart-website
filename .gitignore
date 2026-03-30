@@ -23,3 +23,7 @@ test_reports/
 *.log
 frontend/node_modules/.cache/default-development/6.pack
 disccart.zip
+-e 
+# Environment files
+*.env
+*.env.*
