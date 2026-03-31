@@ -1,40 +1,42 @@
 # DISCCART - AI-Powered Coupon & Deals Platform
 
 ## Original Problem Statement
-Build DISCCART – an AI-powered coupon and deals platform. Scalable startup platform with React + FastAPI + MongoDB. Core features: deal listing, high-conversion coupon reveal UX (auto-copy, countdown timer), admin panel, SEO pages, smart affiliate engine (pretty links).
+Build DISCCART – an AI-powered coupon and deals platform with React + FastAPI + MongoDB.
 
 ## Tech Stack
-- **Frontend**: React.js, TailwindCSS, Shadcn UI, Framer Motion, React Helmet Async, React Markdown
-- **Backend**: FastAPI (Python), Motor (async MongoDB driver)
+- **Frontend**: React 18 + **Vite 5** (migrated from CRA/CRACO), TailwindCSS, Shadcn UI, Framer Motion
+- **Backend**: FastAPI (Python), Motor (async MongoDB)
 - **Database**: MongoDB
-- **Auth**: JWT (httpOnly cookies, access + refresh tokens)
-- **Analytics**: Google Analytics 4 (G-Y5T6ECMHE2)
+- **Auth**: JWT (httpOnly cookies)
+- **Analytics**: Google Analytics 4
 
 ## What's Implemented
+- Phase 1: JWT Auth, Deal CRUD, Coupon Reveal Modal, Social Share
+- Phase 2: SEO (Sitemap, Meta Tags, Robots.txt), GA4, Security Headers
+- Phase 3: Admin Panel (7 tabs), Pretty Links, Static Pages CMS, Blog
+- Phase 4: AI Deal Score (0-100), Verification Badges, Coupons Page
+- Phase 5: Logo & Branding (green+orange palette from logo)
+- Phase 6: Vite Migration & Deployment Prep (March 31, 2026)
 
-### Phase 1 - MVP: JWT Auth, Deal CRUD, Coupon Reveal Modal, Social Share, Homepage
-### Phase 2 - SEO & Analytics: Sitemap, Robots.txt, Meta Tags, GA4, Security Headers
-### Phase 3 - CMS: Admin Panel (7 tabs), Pretty Links, Static Pages, Blog, Footer
-### Phase 4 - Deal Score & Coupons: AI scoring (0-100), Verification badges, Coupons page
-### Phase 5 - Branding: Logo update (cart+% icon), Green+Orange gradient text, color palette alignment
-### Phase 6 - Deployment Prep (March 30, 2026):
-- Created `main.py` entry point for Render deployment
-- Created `Procfile` and `render.yaml` for Render
-- Created `vercel.json` for Vercel SPA routing
-- Created `requirements.prod.txt` (minimal production dependencies)
-- Created comprehensive `DEPLOYMENT_GUIDE.md` with step-by-step instructions
-- Updated `.gitignore` and `README.md`
-- Deployment architecture: Render (backend) + Vercel (frontend) + MongoDB Atlas
+## Build System (Current)
+- **Build tool**: Vite 5.4 (NOT CRA/CRACO)
+- **Entry**: `frontend/index.html` → `src/main.jsx`
+- **Env vars**: `VITE_BACKEND_URL`, `VITE_GA_MEASUREMENT_ID` (VITE_ prefix)
+- **Output**: `dist/` directory
+- **Config files**: `vite.config.js`, `postcss.config.cjs`, `tailwind.config.cjs`
+- **Scripts**: `npm run dev`, `npm run build`, `npm run preview`
+- **Node**: Compatible with 18+ and 20+
 
-## Backlog
-### P1
-- Facebook Pixel tracking (actual implementation)
-### P2
-- User wishlist system
-- Email capture popup for deal alerts
-- Push notifications (Firebase)
-- "Best time to buy" hints
+## Deployment
+- Backend: Render (free) — `uvicorn app:app --host 0.0.0.0 --port $PORT`
+- Frontend: Vercel — Vite preset, output `dist/`
+- Database: MongoDB Atlas (free M0)
+- See DEPLOYMENT_GUIDE.md for full instructions
 
 ## Admin Credentials
 - Email: disccartindia@gmail.com
 - Password: Admin@2026@
+
+## Backlog
+- P1: Facebook Pixel tracking
+- P2: User wishlist, email capture, push notifications

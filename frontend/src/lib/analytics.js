@@ -2,10 +2,10 @@ import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
 // Google Analytics Measurement ID (GA4)
-const GA_MEASUREMENT_ID = process.env.REACT_APP_GA_MEASUREMENT_ID;
+const GA_MEASUREMENT_ID = import.meta.env.VITE_GA_MEASUREMENT_ID;
 
 // Facebook Pixel ID
-const FB_PIXEL_ID = process.env.REACT_APP_FB_PIXEL_ID;
+const FB_PIXEL_ID = import.meta.env.VITE_FB_PIXEL_ID;
 
 // Initialize Google Analytics
 export const initGA = () => {

@@ -115,18 +115,17 @@ You should see:
 1. Click **"Add New..."** → **"Project"**
 2. Import your GitHub repo
 3. Configure:
-   - **Framework Preset**: Create React App
+   - **Framework Preset**: Vite
    - **Root Directory**: `frontend`
    - **Build Command**: `npm run build`
-   - **Output Directory**: `build`
-   - **Node.js Version**: `18.x` (Settings → General → Node.js Version)
+   - **Output Directory**: `dist`
 
 ### 3.3 Set Environment Variable
 In the **"Environment Variables"** section, add:
 
 | Key | Value |
 |-----|-------|
-| `REACT_APP_BACKEND_URL` | `https://disccart-api.onrender.com` |
+| `VITE_BACKEND_URL` | `https://disccart-api.onrender.com` |
 
 4. Click **"Deploy"**
 
@@ -217,9 +216,9 @@ URL-encode them: `@` → `%40`, `#` → `%23`, etc.
 - URL to ping: `https://disccart-api.onrender.com/api/`
 
 ### Issue: Frontend shows blank page
-**Fix**: Make sure `REACT_APP_BACKEND_URL` is set in Vercel WITHOUT trailing slash:
-- ✅ `https://disccart-api.onrender.com`
-- ❌ `https://disccart-api.onrender.com/`
+**Fix**: Make sure `VITE_BACKEND_URL` is set in Vercel WITHOUT trailing slash:
+- Correct: `https://disccart-api.onrender.com`
+- Wrong: `https://disccart-api.onrender.com/`
 
 ### Issue: Login doesn't work (cookies)
 **Fix**: Cookies with `httpOnly` require `SameSite=None; Secure` for cross-origin.
@@ -242,8 +241,10 @@ your-repo/
 │   └── .env                    ← LOCAL only (not pushed to GitHub)
 │
 ├── frontend/
-│   ├── public/
-│   │   └── index.html
+│   ├── vite.config.js           ← Vite config (alias, server)
+│   ├── tailwind.config.cjs      ← Tailwind CSS config
+│   ├── postcss.config.cjs       ← PostCSS config
+│   ├── index.html               ← Entry HTML (Vite root)
 │   ├── src/
 │   │   ├── App.js
 │   │   ├── components/
@@ -277,7 +278,7 @@ SITE_URL=https://disccart.in
 
 ### Frontend (Vercel)
 ```env
-REACT_APP_BACKEND_URL=https://disccart-api.onrender.com
+VITE_BACKEND_URL=https://disccart-api.onrender.com
 ```
 
 ---
