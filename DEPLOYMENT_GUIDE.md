@@ -117,8 +117,9 @@ You should see:
 3. Configure:
    - **Framework Preset**: Create React App
    - **Root Directory**: `frontend`
-   - **Build Command**: `yarn build` (or `npm run build`)
+   - **Build Command**: `npm run build`
    - **Output Directory**: `build`
+   - **Node.js Version**: `18.x` (Settings → General → Node.js Version)
 
 ### 3.3 Set Environment Variable
 In the **"Environment Variables"** section, add:
