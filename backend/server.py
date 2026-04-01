@@ -1548,8 +1548,12 @@ async def seed_admin():
         logger.info("Admin password updated")
     
     # Write credentials
-    import os
+   import os
 from pathlib import Path
+
+# ✅ Define values properly
+admin_email = "disccartindia@gmail.com"
+admin_password = "admin@2026@"
 
 # Create memory directory in correct runtime path
 BASE_DIR = Path(os.getcwd())
@@ -1562,8 +1566,8 @@ file_path = MEMORY_DIR / "test_credentials.md"
 with open(file_path, "w") as f:
     f.write("# Test Credentials\n\n")
     f.write("## Admin Account\n")
-    f.write(f"- Email: {disccartindia@gmail.com}\n")
-    f.write(f"- Password: {admin@2026@}\n")
+    f.write("- Email: " + admin_email + "\n")
+    f.write("- Password: " + admin_password + "\n")
     f.write("- Role: admin\n\n")
     f.write("## Auth Endpoints\n")
     f.write("- POST /api/auth/register\n")
