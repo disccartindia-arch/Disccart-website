@@ -446,10 +446,28 @@ async def register(data: UserRegister, response: Response):
     access_token = create_access_token(user_id, email)
     refresh_token = create_refresh_token(user_id)
     
-    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=False, samesite="lax", max_age=900, path="/")
-    response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=False, samesite="lax", max_age=604800, path="/")
+    # ✅ FIXED COOKIES
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=True,
+        samesite="None",
+        max_age=900,
+        path="/"
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="None",
+        max_age=604800,
+        path="/"
+    )
     
     return {"_id": user_id, "email": email, "name": data.name, "role": "user", "created_at": user_doc["created_at"]}
+
 
 @api_router.post("/auth/login")
 async def login(data: UserLogin, request: Request, response: Response):
@@ -468,7 +486,6 @@ async def login(data: UserLogin, request: Request, response: Response):
     
     user = await db.users.find_one({"email": email})
     if not user or not verify_password(data.password, user["password_hash"]):
-        # Increment failed attempts
         await db.login_attempts.update_one(
             {"identifier": identifier},
             {
@@ -478,6 +495,41 @@ async def login(data: UserLogin, request: Request, response: Response):
             upsert=True
         )
         raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    # ✅ SUCCESS LOGIN
+    await db.login_attempts.delete_one({"identifier": identifier})
+    
+    user_id = str(user["_id"])
+    access_token = create_access_token(user_id, email)
+    refresh_token = create_refresh_token(user_id)
+    
+    # ✅ FIXED COOKIES
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=True,
+        samesite="None",
+        max_age=900,
+        path="/"
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=True,
+        samesite="None",
+        max_age=604800,
+        path="/"
+    )
+    
+    return {
+        "_id": user_id,
+        "email": user["email"],
+        "name": user["name"],
+        "role": user["role"],
+        "created_at": user["created_at"]
+    }
     
     # Clear failed attempts on success
     await db.login_attempts.delete_one({"identifier": identifier})
