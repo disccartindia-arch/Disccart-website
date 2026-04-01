@@ -265,9 +265,9 @@ class CategoryUpdate(BaseModel):
     icon: Optional[str] = None
     image_url: Optional[str] = None
     description: Optional[str] = None
-    
+
 # 4. ✅ THEN ROUTE
-    @api_router.post("/auth/register")
+@api_router.post("/auth/register")
 async def register(data: UserRegister):
     email = data.email.lower()
 
