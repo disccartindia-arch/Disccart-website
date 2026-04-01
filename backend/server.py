@@ -1562,8 +1562,8 @@ file_path = MEMORY_DIR / "test_credentials.md"
 with open(file_path, "w") as f:
     f.write("# Test Credentials\n\n")
     f.write("## Admin Account\n")
-    f.write(f"- Email: {admin_email}\n")
-    f.write(f"- Password: {admin_password}\n")
+    f.write(f"- Email: {disccartindia@gmail.com}\n")
+    f.write(f"- Password: {admin@2026@}\n")
     f.write("- Role: admin\n\n")
     f.write("## Auth Endpoints\n")
     f.write("- POST /api/auth/register\n")
