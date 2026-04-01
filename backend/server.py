@@ -23,171 +23,38 @@ import time
 from collections import defaultdict
 import asyncio
 
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+@api_router.post("/auth/register")
+async def register(data: UserRegister):
+    email = data.email.lower()
 
-ROOT_DIR = Path(__file__).parent
+    existing = await db.users.find_one({"email": email})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
 
-# Rate limiting configuration
-RATE_LIMIT_REQUESTS = int(os.environ.get('RATE_LIMIT_REQUESTS', 100))
-RATE_LIMIT_WINDOW = int(os.environ.get('RATE_LIMIT_WINDOW', 60))
+    hashed = hash_password(data.password)
 
-# In-memory rate limiter (use Redis in production for distributed systems)
-class RateLimiter:
-    def __init__(self):
-        self.requests: Dict[str, list] = defaultdict(list)
-        self._cleanup_task = None
-    
-    def is_rate_limited(self, client_ip: str) -> bool:
-        now = time.time()
-        window_start = now - RATE_LIMIT_WINDOW
-        
-        # Clean old requests
-        self.requests[client_ip] = [t for t in self.requests[client_ip] if t > window_start]
-        
-        # Check if over limit
-        if len(self.requests[client_ip]) >= RATE_LIMIT_REQUESTS:
-            return True
-        
-        # Add current request
-        self.requests[client_ip].append(now)
-        return False
-    
-    def get_remaining(self, client_ip: str) -> int:
-        now = time.time()
-        window_start = now - RATE_LIMIT_WINDOW
-        self.requests[client_ip] = [t for t in self.requests[client_ip] if t > window_start]
-        return max(0, RATE_LIMIT_REQUESTS - len(self.requests[client_ip]))
-
-rate_limiter = RateLimiter()
-
-# Security Headers Middleware
-class SecurityHeadersMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        response = await call_next(request)
-        
-        # Security headers
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["X-XSS-Protection"] = "1; mode=block"
-        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
-        
-        # Cache control for static assets
-        if request.url.path.startswith("/static"):
-            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
-        elif request.url.path in ["/robots.txt", "/sitemap.xml"]:
-            response.headers["Cache-Control"] = "public, max-age=86400"
-        elif request.url.path.startswith("/api"):
-            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-        
-        return response
-
-# Rate Limiting Middleware
-class RateLimitMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        # Skip rate limiting for health checks
-        if request.url.path in ["/api/health", "/api/"]:
-            return await call_next(request)
-        
-        client_ip = request.client.host if request.client else "unknown"
-        
-        if rate_limiter.is_rate_limited(client_ip):
-            return Response(
-                content='{"detail": "Too many requests. Please slow down."}',
-                status_code=429,
-                media_type="application/json",
-                headers={
-                    "Retry-After": str(RATE_LIMIT_WINDOW),
-                    "X-RateLimit-Limit": str(RATE_LIMIT_REQUESTS),
-                    "X-RateLimit-Remaining": "0"
-                }
-            )
-        
-        response = await call_next(request)
-        
-        # Add rate limit headers
-        remaining = rate_limiter.get_remaining(client_ip)
-        response.headers["X-RateLimit-Limit"] = str(RATE_LIMIT_REQUESTS)
-        response.headers["X-RateLimit-Remaining"] = str(remaining)
-        
-        return response
-
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
-
-# JWT Configuration
-JWT_ALGORITHM = "HS256"
-
-def get_jwt_secret() -> str:
-    return os.environ["JWT_SECRET"]
-
-# Password hashing
-def hash_password(password: str) -> str:
-    salt = bcrypt.gensalt()
-    hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
-    return hashed.decode("utf-8")
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
-
-# JWT Token Management
-def create_access_token(user_id: str, email: str) -> str:
-    payload = {
-        "sub": user_id,
+    user_doc = {
         "email": email,
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
-        "type": "access"
+        "password_hash": hashed,
+        "name": data.name,
+        "role": "admin",
+        "created_at": datetime.now(timezone.utc)
     }
-    return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
-def create_refresh_token(user_id: str) -> str:
-    payload = {
-        "sub": user_id,
-        "exp": datetime.now(timezone.utc) + timedelta(days=7),
-        "type": "refresh"
+    result = await db.users.insert_one(user_doc)
+    user_id = str(result.inserted_id)
+
+    access_token = create_access_token(user_id, email)
+
+    return {
+        "token": access_token,
+        "user": {
+            "id": user_id,
+            "email": email,
+            "name": data.name,
+            "role": "admin"
+        }
     }
-    return jwt.encode(payload, get_jwt_secret(), algorithm=JWT_ALGORITHM)
-
-# Auth helper
-async def get_current_user(request: Request) -> dict:
-    token = request.cookies.get("access_token")
-    if not token:
-        auth_header = request.headers.get("Authorization", "")
-        if auth_header.startswith("Bearer "):
-            token = auth_header[7:]
-    if not token:
-        raise HTTPException(status_code=401, detail="Not authenticated")
-    try:
-        payload = jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
-        if payload.get("type") != "access":
-            raise HTTPException(status_code=401, detail="Invalid token type")
-        user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
-        if not user:
-            raise HTTPException(status_code=401, detail="User not found")
-        user["_id"] = str(user["_id"])
-        user.pop("password_hash", None)
-        return user
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-async def get_admin_user(request: Request) -> dict:
-    user = await get_current_user(request)
-    if user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return user
-
-# Create the main app
-app = FastAPI(title="DISCCART API", version="1.0.0")
-
-# Create a router with the /api prefix
-api_router = APIRouter(prefix="/api")
-
 # ===================== PYDANTIC MODELS =====================
 
 # Auth Models
@@ -501,78 +368,7 @@ async def login(data: UserLogin, request: Request, response: Response):
     
     user_id = str(user["_id"])
     access_token = create_access_token(user_id, email)
-    refresh_token = create_refresh_token(user_id)
-    
-    # ✅ FIXED COOKIES
-    response.set_cookie(
-        key="access_token",
-        value=access_token,
-        httponly=True,
-        secure=True,
-        samesite="None",
-        max_age=900,
-        path="/"
-    )
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token,
-        httponly=True,
-        secure=True,
-        samesite="None",
-        max_age=604800,
-        path="/"
-    )
-    
-    return {
-        "_id": user_id,
-        "email": user["email"],
-        "name": user["name"],
-        "role": user["role"],
-        "created_at": user["created_at"]
-    }
-    
-    # Clear failed attempts on success
-    await db.login_attempts.delete_one({"identifier": identifier})
-    
-    user_id = str(user["_id"])
-    access_token = create_access_token(user_id, email)
-    refresh_token = create_refresh_token(user_id)
-    
-    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=False, samesite="lax", max_age=900, path="/")
-    response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=False, samesite="lax", max_age=604800, path="/")
-    
-    return {"_id": user_id, "email": user["email"], "name": user["name"], "role": user["role"], "created_at": user["created_at"]}
-
-@api_router.post("/auth/logout")
-async def logout(response: Response):
-    response.delete_cookie(key="access_token", path="/")
-    response.delete_cookie(key="refresh_token", path="/")
-    return {"message": "Logged out successfully"}
-
-@api_router.get("/auth/me")
-async def get_me(request: Request):
-    user = await get_current_user(request)
-    return user
-
-@api_router.post("/auth/refresh")
-async def refresh_token(request: Request, response: Response):
-    token = request.cookies.get("refresh_token")
-    if not token:
-        raise HTTPException(status_code=401, detail="No refresh token")
-    try:
-        payload = jwt.decode(token, get_jwt_secret(), algorithms=[JWT_ALGORITHM])
-        if payload.get("type") != "refresh":
-            raise HTTPException(status_code=401, detail="Invalid token type")
-        user = await db.users.find_one({"_id": ObjectId(payload["sub"])})
-        if not user:
-            raise HTTPException(status_code=401, detail="User not found")
-        access_token = create_access_token(str(user["_id"]), user["email"])
-        response.set_cookie(key="access_token", value=access_token, httponly=True, secure=False, samesite="lax", max_age=900, path="/")
-        return {"message": "Token refreshed"}
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Refresh token expired")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
+     
 
 # ===================== CATEGORY ROUTES =====================
 
