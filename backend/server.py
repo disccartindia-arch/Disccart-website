@@ -30,38 +30,7 @@ import time
 from collections import defaultdict
 import asyncio
 
-@api_router.post("/auth/register")
-async def register(data: UserRegister):
-    email = data.email.lower()
 
-    existing = await db.users.find_one({"email": email})
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
-
-    hashed = hash_password(data.password)
-
-    user_doc = {
-        "email": email,
-        "password_hash": hashed,
-        "name": data.name,
-        "role": "admin",
-        "created_at": datetime.now(timezone.utc)
-    }
-
-    result = await db.users.insert_one(user_doc)
-    user_id = str(result.inserted_id)
-
-    access_token = create_access_token(user_id, email)
-
-    return {
-        "token": access_token,
-        "user": {
-            "id": user_id,
-            "email": email,
-            "name": data.name,
-            "role": "admin"
-        }
-    }
 # ===================== PYDANTIC MODELS =====================
 
 # Auth Models
@@ -296,6 +265,40 @@ class CategoryUpdate(BaseModel):
     icon: Optional[str] = None
     image_url: Optional[str] = None
     description: Optional[str] = None
+    
+# 4. ✅ THEN ROUTE
+    @api_router.post("/auth/register")
+async def register(data: UserRegister):
+    email = data.email.lower()
+
+    existing = await db.users.find_one({"email": email})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    hashed = hash_password(data.password)
+
+    user_doc = {
+        "email": email,
+        "password_hash": hashed,
+        "name": data.name,
+        "role": "admin",
+        "created_at": datetime.now(timezone.utc)
+    }
+
+    result = await db.users.insert_one(user_doc)
+    user_id = str(result.inserted_id)
+
+    access_token = create_access_token(user_id, email)
+
+    return {
+        "token": access_token,
+        "user": {
+            "id": user_id,
+            "email": email,
+            "name": data.name,
+            "role": "admin"
+        }
+    }
 
 # ===================== AUTH ROUTES =====================
 
