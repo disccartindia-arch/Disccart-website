@@ -1,3 +1,10 @@
+from fastapi import FastAPI, APIRouter, Request, Response, HTTPException
+from datetime import datetime, timezone, timedelta
+
+app = FastAPI()
+
+api_router = APIRouter()
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -2106,3 +2113,5 @@ async def seed_pretty_links():
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+
+    app.include_router(api_router, prefix="/api")
