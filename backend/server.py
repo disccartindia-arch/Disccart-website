@@ -1548,7 +1548,7 @@ async def seed_admin():
         logger.info("Admin password updated")
     
     # Write credentials
-   import os
+import os
 from pathlib import Path
 
 # ✅ Define values properly
