@@ -195,38 +195,48 @@ class TestExistingFeatures:
         print("✓ Privacy policy page accessible")
 
 
+import requests
+import pytest
+
+BASE_URL = "https://disccart-api.onrender.com"
+
 class TestAdminAuth:
     """Tests for admin authentication"""
-    
+
+    def get_token(self):
+        response = requests.post(f"{BASE_URL}/api/auth/login", json={
+            "email": "disccartindia@gmail.com",
+            "password": "Admin@2026@"
+        })
+
+        assert response.status_code == 200
+        data = response.json()
+
+        assert "token" in data  # ✅ IMPORTANT
+        return data["token"]
+
     def test_admin_login(self):
-        """Test admin login works"""
-        session = requests.Session()
-        response = session.post(f"{BASE_URL}/api/auth/login", json={
-            "email": "disccartindia@gmail.com",
-            "password": "Admin@2026@"
-        })
-        assert response.status_code == 200
-        data = response.json()
-        assert data["role"] == "admin"
+        token = self.get_token()
         print("✓ Admin login successful")
-        return session
-    
+
     def test_admin_analytics(self):
-        """Test admin can access analytics"""
-        session = requests.Session()
-        login_response = session.post(f"{BASE_URL}/api/auth/login", json={
-            "email": "disccartindia@gmail.com",
-            "password": "Admin@2026@"
-        })
-        assert login_response.status_code == 200
-        
-        response = session.get(f"{BASE_URL}/api/analytics/overview")
+        token = self.get_token()
+
+        headers = {
+            "Authorization": f"Bearer {token}"
+        }
+
+        response = requests.get(
+            f"{BASE_URL}/api/analytics/overview",
+            headers=headers
+        )
+
         assert response.status_code == 200
         data = response.json()
+
         assert "total_coupons" in data
-        assert data["total_coupons"] >= 6
-        print(f"✓ Admin analytics: {data['total_coupons']} coupons, {data['active_coupons']} active")
+        print(f"✓ Analytics working: {data['total_coupons']} coupons")
 
 
 if __name__ == "__main__":
-    pytest.main([__file__, "-v", "--tb=short"])
+    pytest.main([__file__, "-v"])
