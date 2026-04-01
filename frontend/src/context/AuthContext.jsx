@@ -5,8 +5,19 @@ const AuthContext = createContext(null);
 
 const API_URL = import.meta.env.VITE_BACKEND_URL;
 
-// Configure axios defaults
-axios.defaults.withCredentials = true;
+// ✅ Create axios instance
+const api = axios.create({
+  baseURL: API_URL,
+});
+
+// ✅ Attach token automatically
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 function formatApiErrorDetail(detail) {
   if (detail == null) return "Something went wrong. Please try again.";
@@ -18,12 +29,13 @@ function formatApiErrorDetail(detail) {
 }
 
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null); // null = checking, false = not auth, object = auth
+  const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // ✅ CHECK AUTH
   const checkAuth = useCallback(async () => {
     try {
-      const { data } = await axios.get(`${API_URL}/api/auth/me`, { withCredentials: true });
+      const { data } = await api.get("/api/auth/me");
       setUser(data);
     } catch {
       setUser(false);
@@ -36,14 +48,20 @@ export function AuthProvider({ children }) {
     checkAuth();
   }, [checkAuth]);
 
+  // ✅ LOGIN FIXED
   const login = async (email, password) => {
     try {
-      const { data } = await axios.post(
-        `${API_URL}/api/auth/login`,
-        { email, password },
-        { withCredentials: true }
-      );
-      setUser(data);
+      const { data } = await api.post("/api/auth/login", {
+        email,
+        password,
+      });
+
+      // ✅ STORE TOKEN
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+      }
+
+      setUser(data.user || data);
       return { success: true, user: data };
     } catch (e) {
       return { success: false, error: formatApiErrorDetail(e.response?.data?.detail) || e.message };
@@ -52,34 +70,27 @@ export function AuthProvider({ children }) {
 
   const register = async (email, password, name) => {
     try {
-      const { data } = await axios.post(
-        `${API_URL}/api/auth/register`,
-        { email, password, name },
-        { withCredentials: true }
-      );
-      setUser(data);
+      const { data } = await api.post("/api/auth/register", {
+        email,
+        password,
+        name,
+      });
+
+      if (data.token) {
+        localStorage.setItem("token", data.token);
+      }
+
+      setUser(data.user || data);
       return { success: true, user: data };
     } catch (e) {
       return { success: false, error: formatApiErrorDetail(e.response?.data?.detail) || e.message };
     }
   };
 
-  const logout = async () => {
-    try {
-      await axios.post(`${API_URL}/api/auth/logout`, {}, { withCredentials: true });
-    } catch {
-      // Ignore errors
-    }
+  // ✅ LOGOUT FIXED
+  const logout = () => {
+    localStorage.removeItem("token");
     setUser(false);
-  };
-
-  const refreshToken = async () => {
-    try {
-      await axios.post(`${API_URL}/api/auth/refresh`, {}, { withCredentials: true });
-      await checkAuth();
-    } catch {
-      setUser(false);
-    }
   };
 
   const value = {
@@ -90,7 +101,6 @@ export function AuthProvider({ children }) {
     login,
     register,
     logout,
-    refreshToken,
     checkAuth
   };
 
