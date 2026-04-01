@@ -1548,18 +1548,28 @@ async def seed_admin():
         logger.info("Admin password updated")
     
     # Write credentials
-    Path("/app/memory").mkdir(exist_ok=True)
-    with open("/app/memory/test_credentials.md", "w") as f:
-        f.write("# Test Credentials\n\n")
-        f.write("## Admin Account\n")
-        f.write(f"- Email: {admin_email}\n")
-        f.write(f"- Password: {admin_password}\n")
-        f.write("- Role: admin\n\n")
-        f.write("## Auth Endpoints\n")
-        f.write("- POST /api/auth/register\n")
-        f.write("- POST /api/auth/login\n")
-        f.write("- POST /api/auth/logout\n")
-        f.write("- GET /api/auth/me\n")
+    import os
+from pathlib import Path
+
+# Create memory directory in correct runtime path
+BASE_DIR = Path(os.getcwd())
+MEMORY_DIR = BASE_DIR / "memory"
+MEMORY_DIR.mkdir(parents=True, exist_ok=True)
+
+# Write file inside memory folder
+file_path = MEMORY_DIR / "test_credentials.md"
+
+with open(file_path, "w") as f:
+    f.write("# Test Credentials\n\n")
+    f.write("## Admin Account\n")
+    f.write(f"- Email: {admin_email}\n")
+    f.write(f"- Password: {admin_password}\n")
+    f.write("- Role: admin\n\n")
+    f.write("## Auth Endpoints\n")
+    f.write("- POST /api/auth/register\n")
+    f.write("- POST /api/auth/login\n")
+    f.write("- POST /api/auth/logout\n")
+    f.write("- GET /api/auth/me\n")
 
 async def seed_initial_data():
     """Seed initial categories and sample coupons"""
