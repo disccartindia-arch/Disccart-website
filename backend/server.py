@@ -2,7 +2,7 @@ from fastapi import FastAPI, APIRouter, Request, Response, HTTPException, Upload
 from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
-import AsyncIOMotorClient
+from motor.motor_asyncio import AsyncIOMotorClient
 from dotenv import load_dotenv
 
 import os
