@@ -1,10 +1,6 @@
 from fastapi import FastAPI, APIRouter, Request, Response, HTTPException
 from datetime import datetime, timezone, timedelta
 
-app = FastAPI()
-
-api_router = APIRouter()
-
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -30,6 +26,7 @@ import time
 from collections import defaultdict
 import asyncio
  
+
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
@@ -61,6 +58,32 @@ class UserResponse(BaseModel):
     created_at: datetime
     
     model_config = ConfigDict(populate_by_name=True)
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    def __init__(self, app):
+        super().__init__(app)
+        self.requests = {}
+
+    async def dispatch(self, request: Request, call_next):
+        ip = request.client.host
+        now = time.time()
+
+        if ip not in self.requests:
+            self.requests[ip] = []
+
+        # keep only last 60 sec requests
+        self.requests[ip] = [t for t in self.requests[ip] if now - t < 60]
+
+        if len(self.requests[ip]) > 100:
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=429,
+                content={"detail": "Too many requests"}
+            )
+
+        self.requests[ip].append(now)
+
+        return await call_next(request)
 
 # Category Models
 class CategoryCreate(BaseModel):
@@ -1359,6 +1382,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app = FastAPI()
+app.add_middleware(RateLimitMiddleware)
+api_router = APIRouter()
 
 # ===================== STARTUP & SHUTDOWN =====================
 
