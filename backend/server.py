@@ -27,8 +27,7 @@ from collections import defaultdict
 import asyncio
  
 MONGO_URL = os.getenv("MONGO_URL")
-
-client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URL)
+client = AsyncIOMotorClient(MONGO_URL)
 
 db = client["disccart"]   # 👈 database name
 
