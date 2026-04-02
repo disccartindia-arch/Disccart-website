@@ -1,20 +1,15 @@
-from fastapi import FastAPI, APIRouter, Request, Response, HTTPException
-from datetime import datetime, timezone, timedelta
-
-from dotenv import load_dotenv
-load_dotenv()
-
-from fastapi import FastAPI, APIRouter, HTTPException, Request, Response, UploadFile, File, Depends
+from fastapi import FastAPI, APIRouter, Request, Response, HTTPException, UploadFile, File, Depends
 from fastapi.middleware.gzip import GZipMiddleware
 from starlette.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
-from motor.motor_asyncio import AsyncIOMotorClient
+import AsyncIOMotorClient
+from dotenv import load_dotenv
+
 import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
 from typing import List, Optional, Dict
-import uuid
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
 import bcrypt
@@ -25,12 +20,20 @@ import io
 import time
 from collections import defaultdict
 import asyncio
- 
+
+# Load env
+load_dotenv()
+
+# MongoDB
 MONGO_URL = os.getenv("MONGO_URL")
 client = AsyncIOMotorClient(MONGO_URL)
+db = client["disccart"]
 
-db = client["disccart"]   # 👈 database name
+# App
+app = FastAPI()
+api_router = APIRouter()
 
+# Middleware
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
@@ -38,8 +41,7 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         return response
-app = FastAPI()
-api_router = APIRouter()
+
 app.add_middleware(SecurityHeadersMiddleware)
 
 # ===================== PYDANTIC MODELS =====================
