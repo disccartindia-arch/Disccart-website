@@ -26,6 +26,11 @@ import time
 from collections import defaultdict
 import asyncio
  
+MONGO_URL = os.getenv("MONGO_URL")
+
+client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URL)
+
+db = client["disccart"]   # 👈 database name
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
