@@ -1393,28 +1393,24 @@ app = FastAPI()
 app.add_middleware(RateLimitMiddleware)
 api_router = APIRouter()
 
-# ===================== STARTUP & SHUTDOWN =====================
+# ===================== UTILITY FUNCTIONS =====================
 
-@app.on_event("startup")
-async def startup_event():
-    # Create indexes
-    await db.users.create_index("email", unique=True)
-    await db.login_attempts.create_index("identifier")
-    await db.coupons.create_index([("brand_name", 1), ("is_active", 1)])
-    await db.coupons.create_index([("category_name", 1), ("is_active", 1)])
-    await db.coupons.create_index("deal_score")
-    await db.clicks.create_index("created_at")
-    
-    # Seed admin
-    await seed_admin()
-    
-    # Seed initial data
-    await seed_initial_data()
-    
-    # Recalculate deal scores with enhanced algorithm
-    await recalculate_deal_scores()
-    
-    logger.info("DISCCART API started successfully")
+def hash_password(password: str) -> str:
+    import bcrypt
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode("utf-8"), salt)
+    return hashed.decode("utf-8")
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    import bcrypt
+    return bcrypt.checkpw(
+        plain_password.encode("utf-8"),
+        hashed_password.encode("utf-8")
+    )
+
+
+# ===================== BACKGROUND FUNCTIONS =====================
 
 async def recalculate_deal_scores():
     """Recalculate all deal scores with the enhanced algorithm"""
@@ -1426,16 +1422,22 @@ async def recalculate_deal_scores():
                 {"$set": {"deal_score": new_score}}
             )
 
+
 async def seed_admin():
     admin_email = os.environ.get("ADMIN_EMAIL", "disccartindia@gmail.com")
     admin_password = os.environ.get("ADMIN_PASSWORD", "Admin@2026@")
-    
-    # Delete any existing admin with old email
-    await db.users.delete_many({"role": "admin", "email": {"$ne": admin_email}})
-    
+
+    # Remove old admins (if email changed)
+    await db.users.delete_many({
+        "role": "admin",
+        "email": {"$ne": admin_email}
+    })
+
     existing = await db.users.find_one({"email": admin_email})
+
     if existing is None:
         hashed = hash_password(admin_password)
+
         await db.users.insert_one({
             "email": admin_email,
             "password_hash": hashed,
@@ -1443,10 +1445,40 @@ async def seed_admin():
             "role": "admin",
             "created_at": datetime.now(timezone.utc)
         })
-        logger.info(f"Admin user created: {admin_email}")
+
+        logger.info(f"✅ Admin created: {admin_email}")
+
     elif not verify_password(admin_password, existing["password_hash"]):
-        await db.users.update_one({"email": admin_email}, {"$set": {"password_hash": hash_password(admin_password)}})
-        logger.info("Admin password updated")
+        await db.users.update_one(
+            {"email": admin_email},
+            {"$set": {"password_hash": hash_password(admin_password)}}
+        )
+
+        logger.info("🔄 Admin password updated")
+
+
+# ===================== STARTUP =====================
+
+@app.on_event("startup")
+async def startup_event():
+    # Create indexes
+    await db.users.create_index("email", unique=True)
+    await db.login_attempts.create_index("identifier")
+    await db.coupons.create_index([("brand_name", 1), ("is_active", 1)])
+    await db.coupons.create_index([("category_name", 1), ("is_active", 1)])
+    await db.coupons.create_index("deal_score")
+    await db.clicks.create_index("created_at")
+
+    # Seed admin
+    await seed_admin()
+
+    # Seed initial data
+    await seed_initial_data()
+
+    # Recalculate deal scores
+    await recalculate_deal_scores()
+
+    logger.info("🚀 DISCCART API started successfully")
     
     # Write credentials
 import os
