@@ -71,3 +71,20 @@ export default function CategoryPage() {
     </div>
   );
 }
+
+// Inside CategoryPage.jsx
+const { categorySlug } = useParams(); // Get category from URL (e.g., fashion)
+
+useEffect(() => {
+  const fetchDeals = async () => {
+    try {
+      // CRITICAL: We added '?category=' to the end of the URL
+      const response = await axios.get(`https://disccart-api.onrender.com/api/coupons?category=${categorySlug}`);
+      setDeals(response.data);
+    } catch (error) {
+      console.error("Error fetching filtered deals", error);
+    }
+  };
+  fetchDeals();
+}, [categorySlug]); // Re-run whenever the user clicks a different category
+
