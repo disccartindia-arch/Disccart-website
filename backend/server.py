@@ -14,6 +14,7 @@ import io
 import time
 import bcrypt
 import jwt
+import json
 import asyncio
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
@@ -26,11 +27,12 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# MongoDB
 MONGO_URL = os.getenv("MONGO_URL")
 client = AsyncIOMotorClient(MONGO_URL)
 db = client["disccart"]
 
-# SINGLE APP INSTANCE (Fixes the CORS reset bug)
+# SINGLE APP INSTANCE (CRITICAL: Do not re-initialize 'app' later)
 app = FastAPI()
 api_router = APIRouter()
 
@@ -59,7 +61,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.requests[ip].append(now)
         return await call_next(request)
 
-# ===================== MODELS =====================
+# ===================== PYDANTIC MODELS =====================
 
 class UserRegister(BaseModel):
     email: EmailStr
@@ -86,26 +88,47 @@ class CouponCreate(BaseModel):
     brand_name: str
     category_name: str
     affiliate_url: str
+    image_url: Optional[str] = None
     is_featured: bool = False
     is_verified: bool = True
+    tags: List[str] = []
 
-# ===================== AUTH & UTILS =====================
+class AIContentRequest(BaseModel):
+    product_name: str
+    brand: str
+    discount: str
+    category: str
+
+class PrettyLinkCreate(BaseModel):
+    slug: str
+    destination_url: str
+    title: Optional[str] = None
+    description: Optional[str] = None
+
+# ===================== UTILITY & AUTH FUNCTIONS =====================
 
 def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode("utf-8"), salt).decode("utf-8")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
 
 def create_access_token(user_id: str, email: str):
     payload = {"user_id": user_id, "email": email, "exp": datetime.now(timezone.utc) + timedelta(hours=24)}
-    return jwt.encode(payload, os.getenv("JWT_SECRET", "secret_key_123"), algorithm="HS256")
+    return jwt.encode(payload, os.getenv("JWT_SECRET", "secret_key_2026"), algorithm="HS256")
 
 async def get_admin_user(request: Request):
-    # Logic for Admin verification
+    # Logic to verify admin status from token (simplified for flow)
     return True
 
-# ===================== ADMIN PANEL ROUTES =====================
+def calculate_deal_score(coupon: dict) -> float:
+    score = 50.0
+    if coupon.get("is_featured"): score += 20
+    if coupon.get("is_verified"): score += 10
+    return min(score, 100)
+
+# ===================== ADMIN PANEL & ANALYTICS =====================
 
 @api_router.get("/analytics/overview")
 async def get_analytics_overview(request: Request):
@@ -114,39 +137,66 @@ async def get_analytics_overview(request: Request):
         "total_coupons": await db.coupons.count_documents({}),
         "active_coupons": await db.coupons.count_documents({"is_active": True}),
         "total_clicks": await db.clicks.count_documents({}),
-        "total_users": await db.users.count_documents({})
+        "total_users": await db.users.count_documents({}),
+        "total_pretty_links": await db.pretty_links.count_documents({}),
+        "total_blog_posts": await db.blog_posts.count_documents({})
     }
 
 @api_router.post("/coupons/bulk-upload")
-async def bulk_upload(file: UploadFile = File(...), request: Request = None):
+async def bulk_upload_coupons(file: UploadFile = File(...), request: Request = None):
     if request: await get_admin_user(request)
     content = await file.read()
     reader = csv.DictReader(io.StringIO(content.decode('utf-8')))
-    added = 0
+    coupons_to_insert = []
     for row in reader:
-        row["created_at"] = datetime.now(timezone.utc)
-        row["is_active"] = True
-        await db.coupons.insert_one(row)
-        added += 1
-    return {"message": f"Added {added} coupons"}
+        doc = {
+            "title": row.get("title", "").strip(),
+            "description": row.get("description", ""),
+            "code": row.get("code") if row.get("code") else None,
+            "brand_name": row.get("brand_name", ""),
+            "category_name": row.get("category_name", ""),
+            "affiliate_url": row.get("affiliate_url", ""),
+            "is_active": True,
+            "clicks": 0,
+            "created_at": datetime.now(timezone.utc),
+            "deal_score": 70.0
+        }
+        coupons_to_insert.append(doc)
+    if coupons_to_insert:
+        await db.coupons.insert_many(coupons_to_insert)
+    return {"message": f"Successfully processed {len(coupons_to_insert)} items"}
 
-@api_router.post("/categories")
-async def create_category(data: CategoryCreate, request: Request):
+# ===================== PRETTY LINKS (AFFILIATE REDIRECTS) =====================
+
+@api_router.post("/pretty-links")
+async def create_pretty_link(data: PrettyLinkCreate, request: Request):
     await get_admin_user(request)
     doc = data.model_dump()
-    result = await db.categories.insert_one(doc)
-    return {"id": str(result.inserted_id), **doc}
+    doc["clicks"] = 0
+    doc["created_at"] = datetime.now(timezone.utc)
+    result = await db.pretty_links.insert_one(doc)
+    return {"id": str(result.inserted_id), "short_url": f"/go/{data.slug}"}
 
-# ===================== PUBLIC ROUTES =====================
+@app.get("/go/{slug}")
+async def redirect_pretty_link(slug: str, request: Request):
+    link = await db.pretty_links.find_one({"slug": slug})
+    if not link:
+        raise HTTPException(status_code=404, detail="Link not found")
+    await db.pretty_links.update_one({"_id": link["_id"]}, {"$inc": {"clicks": 1}})
+    return RedirectResponse(url=link["destination_url"])
+
+# ===================== AUTH ROUTES =====================
 
 @api_router.post("/auth/register")
 async def register(data: UserRegister):
     email = data.email.lower()
     if await db.users.find_one({"email": email}):
-        raise HTTPException(status_code=400, detail="User exists")
+        raise HTTPException(status_code=400, detail="Email already registered")
     hashed = hash_password(data.password)
-    result = await db.users.insert_one({"email": email, "password_hash": hashed, "name": data.name, "role": "admin"})
-    return {"id": str(result.inserted_id), "email": email}
+    user_doc = {"email": email, "password_hash": hashed, "name": data.name, "role": "admin", "created_at": datetime.now(timezone.utc)}
+    result = await db.users.insert_one(user_doc)
+    token = create_access_token(str(result.inserted_id), email)
+    return {"token": token, "user": {"id": str(result.inserted_id), "email": email, "role": "admin"}}
 
 @api_router.post("/auth/login")
 async def login(data: UserLogin):
@@ -154,49 +204,83 @@ async def login(data: UserLogin):
     if not user or not verify_password(data.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     token = create_access_token(str(user["_id"]), user["email"])
-    return {"token": token, "user": {"id": str(user["_id"]), "email": user["email"]}}
+    return {"token": token, "user": {"id": str(user["_id"]), "email": user["email"], "role": user.get("role", "user")}}
+
+# ===================== CONTENT ROUTES (CATEGORIES/BLOG/CMS) =====================
 
 @api_router.get("/categories")
 async def get_categories():
-    cats = await db.categories.find().to_list(100)
-    for c in cats: c["id"] = str(c.pop("_id"))
-    return cats
+    categories = await db.categories.find().to_list(100)
+    for cat in categories:
+        cat["id"] = str(cat.pop("_id"))
+        cat["deal_count"] = await db.coupons.count_documents({"category_name": cat["name"]})
+    return categories
+
+@api_router.get("/blog")
+async def get_blog_posts():
+    posts = await db.blog_posts.find({"is_published": True}).to_list(50)
+    for p in posts: p["id"] = str(p.pop("_id"))
+    return posts
 
 @api_router.get("/coupons")
 async def get_coupons(limit: int = 50):
-    coupons = await db.coupons.find({"is_active": True}).limit(limit).to_list(limit)
+    coupons = await db.coupons.find({"is_active": True}).sort("created_at", -1).limit(limit).to_list(limit)
     for c in coupons: c["id"] = str(c.pop("_id"))
     return coupons
 
-# ===================== SYSTEM CONFIG =====================
+# ===================== SEO & SYSTEM =====================
 
+@app.get("/robots.txt")
+async def robots_txt():
+    return Response(content="User-agent: *\nAllow: /\nSitemap: https://disccart.in/sitemap.xml", media_type="text/plain")
+
+@api_router.get("/health")
+async def health():
+    return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
+
+# ===================== APP CONFIGURATION =====================
+
+# 1. Attach the router
 app.include_router(api_router, prefix="/api")
+
+# 2. Middlewares
 app.add_middleware(GZipMiddleware, minimum_size=500)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RateLimitMiddleware)
 
-# THE CORS FIX
+# 3. CORS POLICY (THE FIX)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # THIS STOPS THE CORS ERROR IMMEDIATELY
+    allow_origins=["*"], # Open for all to fix current blocked requests
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.on_event("startup")
-async def startup():
-    # Admin Seed
+# ===================== STARTUP SEEDING =====================
+
+async def seed_admin():
     admin_email = "disccartindia@gmail.com"
-    if not await db.users.find_one({"email": admin_email}):
+    existing = await db.users.find_one({"email": admin_email})
+    if not existing:
         await db.users.insert_one({
             "email": admin_email,
             "password_hash": hash_password("Admin@2026@"),
-            "role": "admin", "name": "Admin"
+            "name": "DISCCART Admin",
+            "role": "admin",
+            "created_at": datetime.now(timezone.utc)
         })
-    logger.info("🚀 Server Live")
+        logger.info(f"✅ Admin account {admin_email} seeded.")
+
+@app.on_event("startup")
+async def startup_event():
+    await seed_admin()
+    # Logic for indexing
+    await db.users.create_index("email", unique=True)
+    await db.coupons.create_index([("brand_name", 1), ("is_active", 1)])
+    logger.info("🚀 DISCCART API Started")
 
 @app.on_event("shutdown")
-async def shutdown():
+async def shutdown_db_client():
     client.close()
     
