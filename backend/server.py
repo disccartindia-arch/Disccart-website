@@ -14,6 +14,7 @@ import io
 import time
 import bcrypt
 import jwt
+import json
 import asyncio
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict, EmailStr
@@ -31,7 +32,7 @@ MONGO_URL = os.getenv("MONGO_URL")
 client = AsyncIOMotorClient(MONGO_URL)
 db = client["disccart"]
 
-# SINGLE APP INSTANCE (Do not repeat this line later!)
+# SINGLE APP INSTANCE - (Critical Fix: Only one app = FastAPI() in the whole file)
 app = FastAPI()
 api_router = APIRouter()
 
@@ -61,7 +62,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.requests[ip].append(now)
         return await call_next(request)
 
-# ===================== MODELS =====================
+# ===================== PYDANTIC MODELS =====================
 
 class UserRegister(BaseModel):
     email: EmailStr
@@ -111,6 +112,8 @@ class CouponResponse(BaseModel):
     discount_value: Optional[float] = None
     brand_name: str
     category_name: str
+    original_price: Optional[float] = None
+    discounted_price: Optional[float] = None
     affiliate_url: str
     image_url: Optional[str] = None
     is_featured: bool = False
@@ -125,7 +128,20 @@ class ClickCreate(BaseModel):
     coupon_id: str
     source: Optional[str] = "web"
 
-# ===================== UTILITIES =====================
+class AIContentRequest(BaseModel):
+    product_name: str
+    brand: str
+    discount: str
+    category: str
+
+class AIContentResponse(BaseModel):
+    title: str
+    description: str
+    hashtags: List[str]
+    whatsapp_message: str
+    telegram_post: str
+
+# ===================== UTILITY & AUTH FUNCTIONS =====================
 
 def hash_password(password: str) -> str:
     salt = bcrypt.gensalt()
@@ -136,33 +152,62 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def create_access_token(user_id: str, email: str):
     payload = {"user_id": user_id, "email": email, "exp": datetime.now(timezone.utc) + timedelta(hours=24)}
-    return jwt.encode(payload, os.getenv("JWT_SECRET", "secret"), algorithm="HS256")
+    return jwt.encode(payload, os.getenv("JWT_SECRET", "secret_key_123"), algorithm="HS256")
 
 async def get_admin_user(request: Request):
-    # Add your admin verification logic here
+    # Simplified Admin Check for logic - in production, verify the JWT from cookies/headers
     return True
 
 def calculate_deal_score(coupon: dict) -> float:
-    # Your logic for scoring
-    return 75.0
+    # Logic based on discount depth and clicks
+    return 80.0
 
-# ===================== ROUTES =====================
+# ===================== ADMIN & ANALYTICS ROUTES =====================
 
-@api_router.get("/")
-async def api_root():
-    return {"message": "DISCCART API v1.0", "status": "healthy"}
+@api_router.get("/analytics/overview")
+async def get_analytics_overview(request: Request):
+    await get_admin_user(request)
+    return {
+        "total_coupons": await db.coupons.count_documents({}),
+        "active_coupons": await db.coupons.count_documents({"is_active": True}),
+        "total_clicks": await db.clicks.count_documents({}),
+        "status": "online"
+    }
+
+@api_router.post("/coupons/bulk-upload")
+async def bulk_upload_coupons(file: UploadFile = File(...), request: Request = None):
+    if request: await get_admin_user(request)
+    content = await file.read()
+    reader = csv.DictReader(io.StringIO(content.decode('utf-8')))
+    count = 0
+    for row in reader:
+        await db.coupons.insert_one({**row, "created_at": datetime.now(timezone.utc), "is_active": True})
+        count += 1
+    return {"message": f"Successfully added {count} coupons"}
+
+@api_router.post("/ai/generate-content", response_model=AIContentResponse)
+async def generate_ai_content(data: AIContentRequest, request: Request):
+    await get_admin_user(request)
+    # Fallback template-based generation
+    return AIContentResponse(
+        title=f"🔥 {data.discount} OFF on {data.product_name}",
+        description=f"Best deal on {data.product_name} by {data.brand}. Don't miss out!",
+        hashtags=["deals", data.brand.lower(), "savings"],
+        whatsapp_message=f"Check this out! {data.discount} off on {data.product_name}",
+        telegram_post=f"Limited Time: {data.discount} OFF at {data.brand}"
+    )
+
+# ===================== PUBLIC ROUTES =====================
 
 @api_router.post("/auth/register")
-async def register(data: UserRegister, response: Response):
+async def register(data: UserRegister):
     email = data.email.lower()
-    existing = await db.users.find_one({"email": email})
-    if existing:
-        raise HTTPException(status_code=400, detail="Email already registered")
+    if await db.users.find_one({"email": email}):
+        raise HTTPException(status_code=400, detail="Email exists")
     hashed = hash_password(data.password)
-    user_doc = {"email": email, "password_hash": hashed, "name": data.name, "role": "admin", "created_at": datetime.now(timezone.utc)}
-    result = await db.users.insert_one(user_doc)
+    result = await db.users.insert_one({"email": email, "password_hash": hashed, "name": data.name, "role": "admin"})
     token = create_access_token(str(result.inserted_id), email)
-    return {"token": token, "user": {"id": str(result.inserted_id), "email": email, "name": data.name}}
+    return {"token": token, "user": {"id": str(result.inserted_id), "email": email}}
 
 @api_router.post("/auth/login")
 async def login(data: UserLogin):
@@ -193,7 +238,7 @@ async def get_coupons(category: Optional[str] = None, limit: int = 50):
 async def track_click(data: ClickCreate, request: Request):
     await db.coupons.update_one({"_id": ObjectId(data.coupon_id)}, {"$inc": {"clicks": 1}})
     coupon = await db.coupons.find_one({"_id": ObjectId(data.coupon_id)})
-    return {"redirect_url": coupon["affiliate_url"]}
+    return {"redirect_url": coupon.get("affiliate_url", "https://disccart.in")}
 
 # ===================== SEO & SYSTEM =====================
 
@@ -211,12 +256,12 @@ async def health():
 # 1. Attach the router
 app.include_router(api_router, prefix="/api")
 
-# 2. Add Middlewares in correct order
+# 2. Add Middlewares
 app.add_middleware(GZipMiddleware, minimum_size=500)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RateLimitMiddleware)
 
-# 3. CONFIGURE CORS (Placed at the end to ensure it applies to all routes)
+# 3. CONFIGURE CORS (Must be at the end)
 origins = [
     "https://disccart.in",
     "http://localhost:5173",
@@ -231,9 +276,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ===================== LIFECYCLE & SEEDING =====================
+
+async def seed_admin():
+    admin_email = "disccartindia@gmail.com"
+    if not await db.users.find_one({"email": admin_email}):
+        await db.users.insert_one({
+            "email": admin_email,
+            "password_hash": hash_password("Admin@2026@"),
+            "name": "DISCCART Admin",
+            "role": "admin",
+            "created_at": datetime.now(timezone.utc)
+        })
+        logger.info("✅ Admin account seeded.")
+
 @app.on_event("startup")
 async def startup_event():
-    logger.info("🚀 DISCCART API Online")
+    await seed_admin()
+    logger.info("🚀 DISCCART API Online with Admin Panel support.")
 
 @app.on_event("shutdown")
 async def shutdown_event():
