@@ -30,6 +30,39 @@ function CouponCard({ coupon }) {
     }
   };
 
+  // Inside your CouponCard component
+const CouponCard = ({ coupon }) => {
+  return (
+    <div className="deal-card">
+      {/* ... other code ... */}
+      
+      <div className="price-container">
+        {/* Only show the price section if prices exist */}
+        {coupon.discounted_price && (
+          <div className="flex items-center gap-2">
+            <span className="text-xl font-bold text-green-600">
+              ₹{coupon.discounted_price}
+            </span>
+            {coupon.original_price && (
+              <span className="text-sm text-gray-400 line-through">
+                ₹{coupon.original_price}
+              </span>
+            )}
+            {/* Optional: Show % off badge */}
+            {coupon.original_price && (
+              <span className="text-xs font-medium text-red-500">
+                ({Math.round(((coupon.original_price - coupon.discounted_price) / coupon.original_price) * 100)}% OFF)
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* ... rest of card ... */}
+    </div>
+  );
+};
+
   const getDiscountDisplay = () => {
     if (coupon.discount_type === 'percentage' && coupon.discount_value) return `${coupon.discount_value}% OFF`;
     if (coupon.discount_type === 'flat' && coupon.discount_value) return `₹${coupon.discount_value} OFF`;
