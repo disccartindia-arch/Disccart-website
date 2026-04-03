@@ -59,12 +59,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         self.requests[ip].append(now)
         return await call_next(request)
 
-# ===================== PYDANTIC MODELS (Full CMS & Admin) =====================
-
-class UserRegister(BaseModel):
-    email: EmailStr
-    password: str
-    name: str
+# ===================== PYDANTIC MODELS =====================
 
 class UserLogin(BaseModel):
     email: EmailStr
@@ -73,9 +68,25 @@ class UserLogin(BaseModel):
 class CategoryCreate(BaseModel):
     name: str
     slug: str
-    icon: Optional[str] = None
+    icon: Optional[str] = "Tag"
     image_url: Optional[str] = None
     description: Optional[str] = None
+
+class CouponCreate(BaseModel):
+    title: str
+    description: Optional[str] = None
+    code: Optional[str] = None
+    discount_type: str = "percentage"
+    discount_value: Optional[float] = None
+    brand_name: str
+    category_name: str
+    affiliate_url: str
+    image_url: Optional[str] = None
+    # PRICE FIELDS FOR DEAL CARDS
+    original_price: Optional[float] = None
+    discounted_price: Optional[float] = None
+    is_featured: bool = False
+    is_verified: bool = True
 
 class PrettyLinkCreate(BaseModel):
     slug: str
@@ -105,13 +116,13 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 def create_access_token(user_id: str, email: str):
     payload = {"user_id": user_id, "email": email, "exp": datetime.now(timezone.utc) + timedelta(hours=24)}
-    return jwt.encode(payload, os.getenv("JWT_SECRET", "secret_2026"), algorithm="HS256")
+    return jwt.encode(payload, os.getenv("JWT_SECRET", "secret_key_2026"), algorithm="HS256")
 
 async def get_admin_user(request: Request):
-    # Verified admin logic can be added here
+    # Admin verification logic
     return True
 
-# ===================== ADMIN PANEL (RESTORED ALL FEATURES) =====================
+# ===================== ADMIN PANEL & ANALYTICS =====================
 
 @api_router.get("/analytics/overview")
 async def get_analytics_overview(request: Request):
@@ -125,43 +136,68 @@ async def get_analytics_overview(request: Request):
         "total_blog_posts": await db.blog_posts.count_documents({})
     }
 
+# ============= CATEGORY MANAGEMENT (ADD/DELETE) =============
+
+@api_router.post("/categories")
+async def create_category(data: CategoryCreate, request: Request):
+    await get_admin_user(request)
+    doc = data.model_dump()
+    doc["created_at"] = datetime.now(timezone.utc)
+    result = await db.categories.insert_one(doc)
+    return {"id": str(result.inserted_id), **doc}
+
+@api_router.delete("/categories/{category_id}")
+async def delete_category(category_id: str, request: Request):
+    await get_admin_user(request)
+    result = await db.categories.delete_one({"_id": ObjectId(category_id)})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Category not found")
+    return {"message": "Category deleted successfully"}
+
+# ============= BULK UPLOAD (WITH PRICES & CATEGORIES) =============
+
 @api_router.post("/coupons/bulk-upload")
-async def bulk_upload(file: UploadFile = File(...), request: Request = None):
+async def bulk_upload_coupons(file: UploadFile = File(...), request: Request = None):
     if request: await get_admin_user(request)
     content = await file.read()
     reader = csv.DictReader(io.StringIO(content.decode('utf-8')))
-    count = 0
+    coupons_to_insert = []
+    
     for row in reader:
-        row["created_at"] = datetime.now(timezone.utc)
-        row["is_active"] = True
-        row["clicks"] = 0
-        await db.coupons.insert_one(row)
-        count += 1
-    return {"message": f"Processed {count} coupons"}
+        # Convert prices to numbers
+        orig_price = float(row.get("original_price")) if row.get("original_price") else None
+        disc_price = float(row.get("discounted_price")) if row.get("discounted_price") else None
+        
+        doc = {
+            "title": row.get("title", "").strip(),
+            "description": row.get("description", ""),
+            "code": row.get("code") if row.get("code") else None,
+            "discount_type": row.get("discount_type", "percentage"),
+            "discount_value": float(row.get("discount_value", 0)) if row.get("discount_value") else 0,
+            "brand_name": row.get("brand_name", ""),
+            "category_name": row.get("category_name", "Other"),
+            "original_price": orig_price,
+            "discounted_price": disc_price,
+            "affiliate_url": row.get("affiliate_url", ""),
+            "image_url": row.get("image_url"),
+            "is_active": True,
+            "clicks": 0,
+            "created_at": datetime.now(timezone.utc),
+        }
+        coupons_to_insert.append(doc)
+        
+    if coupons_to_insert:
+        await db.coupons.insert_many(coupons_to_insert)
+    return {"message": f"Successfully uploaded {len(coupons_to_insert)} deals"}
 
-# ===================== CMS & BLOG ROUTES (RESTORED) =====================
-
-@api_router.get("/pages")
-async def get_pages():
-    pages = await db.pages.find().to_list(100)
-    for p in pages: p["id"] = str(p.pop("_id"))
-    return pages
+# ===================== CMS & PRETTY LINKS =====================
 
 @api_router.post("/pages")
 async def create_page(data: PageCreate, request: Request):
     await get_admin_user(request)
     doc = data.model_dump()
-    doc["created_at"] = datetime.now(timezone.utc)
     result = await db.pages.insert_one(doc)
     return {"id": str(result.inserted_id), **doc}
-
-@api_router.get("/blog")
-async def get_blog():
-    posts = await db.blog_posts.find().to_list(100)
-    for p in posts: p["id"] = str(p.pop("_id"))
-    return posts
-
-# ===================== PRETTY LINKS (AFFILIATE) =====================
 
 @api_router.post("/pretty-links")
 async def create_pretty_link(data: PrettyLinkCreate, request: Request):
@@ -198,8 +234,11 @@ async def get_categories():
     return categories
 
 @api_router.get("/coupons")
-async def get_coupons(limit: int = 50):
-    coupons = await db.coupons.find({"is_active": True}).limit(limit).to_list(limit)
+async def get_coupons(category: Optional[str] = None, limit: int = 50):
+    query = {"is_active": True}
+    if category:
+        query["category_name"] = category
+    coupons = await db.coupons.find(query).sort("created_at", -1).limit(limit).to_list(limit)
     for c in coupons: c["id"] = str(c.pop("_id"))
     return coupons
 
@@ -210,7 +249,6 @@ app.add_middleware(GZipMiddleware, minimum_size=500)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RateLimitMiddleware)
 
-# THE CORS FIX (REPLACED WILDCARD '*' WITH EXACT ORIGINS)
 origins = [
     "https://disccart.in",
     "https://www.disccart.in",
@@ -220,7 +258,7 @@ origins = [
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  # EXACT DOMAINS, NOT "*"
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
