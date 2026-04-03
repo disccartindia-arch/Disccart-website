@@ -16,7 +16,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from '../components/ui/table';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger
+  Dialog, DialogContent, DialogHeader, DialogTitle
 } from '../components/ui/dialog';
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
@@ -42,23 +42,16 @@ export default function AdminPage() {
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   
-  // Dialog states
   const [showCouponDialog, setShowCouponDialog] = useState(false);
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
-  const [showPageDialog, setShowPageDialog] = useState(false);
-  const [showBlogDialog, setShowBlogDialog] = useState(false);
   
-  // Editing states
   const [editingItem, setEditingItem] = useState(null);
-  
   const fileInputRef = useRef(null);
   const [uploadStatus, setUploadStatus] = useState(null);
 
   useEffect(() => {
-    if (isAdmin) {
-      fetchData();
-    }
+    if (isAdmin) { fetchData(); }
   }, [isAdmin]);
 
   const fetchData = async () => {
@@ -79,7 +72,6 @@ export default function AdminPage() {
       setPages(pagesData);
       setBlogPosts(blogData);
     } catch (error) {
-      console.error('Failed to fetch data:', error);
       toast.error('Failed to load data');
     } finally {
       setLoading(false);
@@ -87,85 +79,162 @@ export default function AdminPage() {
   };
 
   if (authLoading) {
-    return (
-      <div className="min-h-[50vh] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 text-[#ee922c] animate-spin" />
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="animate-spin" /></div>;
   }
 
   if (!isAuthenticated || !isAdmin) {
     return <Navigate to="/login" replace />;
   }
 
-  // File upload handler
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadStatus({ loading: true, message: 'Uploading...' });
     try {
-      const result = await bulkUploadCoupons(file);
-      setUploadStatus({ loading: false, success: true, message: `Successfully added coupons` });
-      toast.success(`Coupons uploaded successfully`);
+      await bulkUploadCoupons(file);
+      setUploadStatus({ loading: false, success: true, message: 'Upload Successful' });
+      toast.success('Deals uploaded');
       fetchData();
-    } catch (error) {
-      setUploadStatus({ loading: false, success: false, message: 'Upload failed' });
-      toast.error('Upload failed');
+    } catch (err) {
+      setUploadStatus({ loading: false, success: false, message: 'Upload Failed' });
     }
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleDelete = async (type, id, name) => {
-    if (!window.confirm(`Delete "${name}"?`)) return;
+    if (!window.confirm(`Delete ${name}?`)) return;
     try {
       if (type === 'coupon') await deleteCoupon(id);
-      else if (type === 'category') await deleteCategory(id);
-      else if (type === 'link') await deletePrettyLink(id);
-      else if (type === 'page') await deletePage(id);
-      else if (type === 'blog') await deleteBlogPost(id);
-      toast.success('Deleted successfully');
+      if (type === 'category') await deleteCategory(id);
+      toast.success('Deleted');
       fetchData();
-    } catch (error) {
-      toast.error('Delete failed');
-    }
+    } catch { toast.error('Delete failed'); }
   };
 
-  const tabs = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'coupons', label: 'Deals', icon: Tag },
-    { id: 'categories', label: 'Categories', icon: Tag },
-    { id: 'links', label: 'Pretty Links', icon: Link2 },
-    { id: 'pages', label: 'Pages', icon: FileText },
-    { id: 'blog', label: 'Blog', icon: BookOpen },
-    { id: 'upload', label: 'CSV Upload', icon: Upload }
-  ];
-
   return (
-    <div className="pb-20 md:pb-8" data-testid="admin-page">
+    <div className="pb-20 md:pb-8">
       <AdminSEO />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex items-center justify-between mb-8">
-          <div>
-            <h1 className="font-display font-bold text-3xl text-gray-900">Admin Panel</h1>
-            <p className="text-gray-500">Manage your DISCCART platform</p>
-          </div>
-        </div>
-
-        <div className="flex gap-2 mb-6 overflow-x-auto hide-scrollbar pb-2">
-          {tabs.map(({ id, label, icon: Icon }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl font-medium text-sm whitespace-nowrap transition-all ${
-                activeTab === id ? 'bg-[#ee922c] text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-[#ee922c]'
-              }`}
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        <h1 className="text-3xl font-bold mb-8">Admin Panel</h1>
+        
+        {/* Tab Navigation */}
+        <div className="flex gap-4 mb-8 overflow-x-auto pb-2">
+          {['dashboard', 'coupons', 'categories', 'upload'].map((tab) => (
+            <Button 
+              key={tab} 
+              variant={activeTab === tab ? 'default' : 'outline'}
+              onClick={() => setActiveTab(tab)}
+              className="capitalize"
             >
-              <Icon className="w-4 h-4" />
-              {label}
-            </button>
+              {tab}
+            </Button>
           ))}
         </div>
 
-        {activeTab === 'dashboard' && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6"></motion.div>
-          
+        {/* Tab Content */}
+        <div className="min-h-[400px]">
+          {activeTab === 'dashboard' && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="p-6 bg-white border rounded-xl">
+                <p className="text-sm text-gray-500">Total Deals</p>
+                <p className="text-3xl font-bold">{analytics?.total_coupons || 0}</p>
+              </div>
+              <div className="p-6 bg-white border rounded-xl">
+                <p className="text-sm text-gray-500">Active Deals</p>
+                <p className="text-3xl font-bold text-green-600">{analytics?.active_coupons || 0}</p>
+              </div>
+              <div className="p-6 bg-white border rounded-xl">
+                <p className="text-sm text-gray-500">Total Clicks</p>
+                <p className="text-3xl font-bold text-orange-500">{analytics?.total_clicks || 0}</p>
+              </div>
+            </motion.div>
+          )}
+
+          {activeTab === 'coupons' && (
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <h2 className="text-xl font-bold">Manage Deals</h2>
+                <Button onClick={() => { setEditingItem(null); setShowCouponDialog(true); }}>Add Deal</Button>
+              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Title</TableHead>
+                    <TableHead>Brand</TableHead>
+                    <TableHead>Price</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {coupons.map((c) => (
+                    <TableRow key={c.id}>
+                      <TableCell>{c.title}</TableCell>
+                      <TableCell>{c.brand_name}</TableCell>
+                      <TableCell>₹{c.discounted_price || '-'}</TableCell>
+                      <TableCell className="text-right">
+                        <Button variant="ghost" onClick={() => { setEditingItem(c); setShowCouponDialog(true); }}><Pencil className="w-4 h-4" /></Button>
+                        <Button variant="ghost" className="text-red-500" onClick={() => handleDelete('coupon', c.id, c.title)}><Trash2 className="w-4 h-4" /></Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+
+          {activeTab === 'upload' && (
+            <div className="max-w-xl mx-auto p-8 border-2 border-dashed rounded-2xl text-center">
+              <Upload className="mx-auto w-12 h-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-bold">Bulk Upload CSV</h3>
+              <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
+              <Button className="mt-4" onClick={() => fileInputRef.current.click()}>Select File</Button>
+              {uploadStatus && <p className="mt-4 text-sm">{uploadStatus.message}</p>}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Dialogs */}
+      <Dialog open={showCouponDialog} onOpenChange={setShowCouponDialog}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{editingItem ? 'Edit' : 'Add'} Deal</DialogTitle></DialogHeader>
+          <CouponForm item={editingItem} categories={categories} onSuccess={() => { setShowCouponDialog(false); fetchData(); }} />
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+function CouponForm({ item, categories, onSuccess }) {
+  const [form, setForm] = useState(item || { title: '', brand_name: '', category_name: '', original_price: '', discounted_price: '', affiliate_url: '' });
+  
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      if (item) await updateCoupon(item.id, form);
+      else await createCoupon(form);
+      toast.success('Saved');
+      onSuccess();
+    } catch { toast.error('Save failed'); }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <Input placeholder="Title" value={form.title} onChange={e => setForm({...form, title: e.target.value})} required />
+      <div className="grid grid-cols-2 gap-4">
+        <Input type="number" placeholder="Original Price" value={form.original_price} onChange={e => setForm({...form, original_price: e.target.value})} />
+        <Input type="number" placeholder="Discounted Price" value={form.discounted_price} onChange={e => setForm({...form, discounted_price: e.target.value})} />
+      </div>
+      <Input placeholder="Brand" value={form.brand_name} onChange={e => setForm({...form, brand_name: e.target.value})} required />
+      <select 
+        className="w-full p-2 border rounded-md" 
+        value={form.category_name} 
+        onChange={e => setForm({...form, category_name: e.target.value})}
+      >
+        <option value="">Select Category</option>
+        {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
+      </select>
+      <Input placeholder="Affiliate URL" value={form.affiliate_url} onChange={e => setForm({...form, affiliate_url: e.target.value})} required />
+      <Button type="submit" className="w-full">Save Deal</Button>
+    </form>
+  );
+}
