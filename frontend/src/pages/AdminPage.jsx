@@ -61,6 +61,21 @@ export default function AdminPage() {
     }
   }, [isAdmin]);
 
+  // Add Category Function
+const handleAddCategory = async (e) => {
+  e.preventDefault();
+  await axios.post('https://disccart-api.onrender.com/api/categories', newCategoryData, { withCredentials: true });
+  alert("Category Added!");
+};
+
+// Delete Category Function
+const handleDeleteCategory = async (categoryId) => {
+  if(window.confirm("Are you sure?")) {
+    await axios.delete(`https://disccart-api.onrender.com/api/categories/${categoryId}`, { withCredentials: true });
+    // Refresh your list here
+  }
+};
+
   const fetchData = async () => {
     setLoading(true);
     try {
