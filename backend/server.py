@@ -1,7 +1,7 @@
 from fastapi import FastAPI, APIRouter, Request, HTTPException, UploadFile, File, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, validator
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
 from bson import ObjectId
@@ -50,6 +50,14 @@ class CouponCreate(BaseModel):
     discount_value: float = 0
     is_active: bool = True
 
+    # Fix: Ensure URLs always start with http/https
+    @validator('affiliate_url')
+    def validate_url(cls, v):
+        v = v.strip()
+        if not v.startswith(('http://', 'https://')):
+            return f'https://{v}'
+        return v
+
 # ===================== AUTH UTILS =====================
 
 def hash_password(password: str) -> str:
@@ -94,7 +102,7 @@ async def get_analytics():
         "total_categories": await db.categories.count_documents({})
     }
 
-# --- CATEGORIES (Fixes Add/Delete Issue) ---
+# --- CATEGORIES ---
 @api_router.get("/categories")
 async def get_categories():
     cats = await db.categories.find().to_list(100)
@@ -121,12 +129,10 @@ async def delete_cat(cat_id: str):
 @api_router.get("/coupons-only")
 async def get_coupons(category: Optional[str] = None, isAdmin: bool = False):
     query = {}
-    # If it's a regular user on a phone, only show active ones
     if not isAdmin:
         query["is_active"] = True
     
-    # Handle category filtering
-    if category and category != "All" and category != "undefined":
+    if category and category not in ["All", "undefined", "null"]:
         query["category_name"] = category
 
     coupons = await db.coupons.find(query).sort("created_at", -1).to_list(1000)
@@ -154,15 +160,22 @@ async def delete_coupon(coupon_id: str):
     await db.coupons.delete_one({"_id": ObjectId(coupon_id)})
     return {"status": "deleted"}
 
+# --- IMPROVED CLICK TRACKING ---
 @api_router.post("/clicks")
 async def track_click(request: Request):
     try:
         data = await request.json()
-        data["timestamp"] = datetime.now(timezone.utc)
-        await db.clicks.insert_one(data)
+        click_doc = {
+            "coupon_id": data.get("coupon_id"),
+            "brand": data.get("brand"),
+            "timestamp": datetime.now(timezone.utc),
+            "ip": request.client.host
+        }
+        await db.clicks.insert_one(click_doc)
         return {"status": "tracked"}
-    except:
-        return {"status": "error"}
+    except Exception as e:
+        logger.error(f"Click Error: {e}")
+        return {"status": "error", "message": "Failed to track"}
 
 @api_router.post("/coupons/bulk-upload")
 async def bulk_upload(file: UploadFile = File(...)):
@@ -170,13 +183,22 @@ async def bulk_upload(file: UploadFile = File(...)):
     reader = csv.DictReader(io.StringIO(content.decode('utf-8')))
     count = 0
     for row in reader:
+        # Clean URL during bulk upload
+        url = row.get("affiliate_url", "").strip()
+        if url and not url.startswith(('http://', 'https://')):
+            url = f'https://{url}'
+        
+        row["affiliate_url"] = url
         row["is_active"] = True
         row["created_at"] = datetime.now(timezone.utc)
+        
         try:
-            row["original_price"] = float(row.get("original_price", 0))
-            row["discounted_price"] = float(row.get("discounted_price", 0))
+            row["original_price"] = float(row.get("original_price", 0) or 0)
+            row["discounted_price"] = float(row.get("discounted_price", 0) or 0)
         except:
-            pass
+            row["original_price"] = 0.0
+            row["discounted_price"] = 0.0
+            
         await db.coupons.insert_one(row)
         count += 1
     return {"message": f"Successfully uploaded {count} deals"}
@@ -185,12 +207,10 @@ async def bulk_upload(file: UploadFile = File(...)):
 
 app.include_router(api_router, prefix="/api")
 
-# CRITICAL FIX: If using credentials, you cannot use "*"
-# Update this list with your actual Vercel URL
 origins = [
     "https://disccart.in",
     "https://www.disccart.in",
-    "https://disccart-frontend.vercel.app", # Replace with your actual vercel link
+    "https://disccart-frontend.vercel.app", 
     "http://localhost:5173",
     "http://localhost:3000"
 ]

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BadgeCheck, Copy, ExternalLink, Clock, Tag, ShieldAlert, ShieldX, TrendingUp } from 'lucide-react';
+import { BadgeCheck, Copy, ExternalLink, Tag, ShieldAlert, ShieldX, TrendingUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 import CouponRevealModal from './CouponRevealModal';
 import { ShareButtonsCompact } from './ShareButtons';
@@ -60,6 +60,19 @@ function VerificationBadge({ status }) {
 export default function DealCard({ deal }) {
   const [showModal, setShowModal] = useState(false);
 
+  // --- URL & ID FIXES ---
+  // Ensure the ID is available for tracking
+  const dealId = deal.id || deal._id;
+  
+  // Ensure the affiliate URL is clean for the modal to use
+  const sanitizedDeal = {
+    ...deal,
+    id: dealId,
+    affiliate_url: deal.affiliate_url?.startsWith('http') 
+      ? deal.affiliate_url 
+      : `https://${deal.affiliate_url}`
+  };
+
   const getDiscountDisplay = () => {
     if (deal.discount_type === 'percentage' && deal.discount_value) {
       return `${deal.discount_value}% OFF`;
@@ -79,7 +92,7 @@ export default function DealCard({ deal }) {
         className="deal-card bg-white rounded-2xl border border-gray-100 shadow-sm flex flex-col relative overflow-hidden group p-4"
         whileHover={{ y: -4 }}
         transition={{ duration: 0.2 }}
-        data-testid={`deal-card-${deal.id}`}
+        data-testid={`deal-card-${dealId}`}
       >
         {/* Featured Badge */}
         {deal.is_featured && (
@@ -138,19 +151,22 @@ export default function DealCard({ deal }) {
         {deal.original_price && deal.discounted_price && (
           <div className="flex items-center gap-2 mb-3">
             <span className="font-display font-black text-xl text-[#3c7b48]">
-              ₹{deal.discounted_price.toLocaleString()}
+              ₹{Number(deal.discounted_price).toLocaleString()}
             </span>
             <span className="text-sm text-gray-400 line-through">
-              ₹{deal.original_price.toLocaleString()}
+              ₹{Number(deal.original_price).toLocaleString()}
             </span>
           </div>
         )}
 
         {/* CTA Button */}
         <button
-          onClick={() => setShowModal(true)}
-          className="mt-auto relative overflow-hidden bg-gradient-to-r from-[#ee922c] to-[#d9811f] text-white font-bold rounded-xl px-6 py-4 w-full group/btn flex items-center justify-center gap-2 transition-all hover:shadow-lg hover:shadow-orange-500/25 active:scale-98"
-          data-testid={`reveal-btn-${deal.id}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowModal(true);
+          }}
+          className="mt-auto relative overflow-hidden bg-gradient-to-r from-[#ee922c] to-[#d9811f] text-white font-bold rounded-xl px-6 py-4 w-full group/btn flex items-center justify-center gap-2 transition-all hover:shadow-lg hover:shadow-orange-500/25 active:scale-95"
+          data-testid={`reveal-btn-${dealId}`}
         >
           {hasCode ? (
             <>
@@ -178,14 +194,14 @@ export default function DealCard({ deal }) {
         <div className="mt-3 pt-3 border-t border-gray-100">
           <div className="flex items-center justify-between">
             <span className="text-xs text-gray-400 font-medium">Share this deal</span>
-            <ShareButtonsCompact deal={deal} />
+            <ShareButtonsCompact deal={sanitizedDeal} />
           </div>
         </div>
       </motion.div>
 
-      {/* Reveal Modal */}
+      {/* Reveal Modal - Passing the sanitized deal */}
       <CouponRevealModal 
-        deal={deal} 
+        deal={sanitizedDeal} 
         isOpen={showModal} 
         onClose={() => setShowModal(false)} 
       />
