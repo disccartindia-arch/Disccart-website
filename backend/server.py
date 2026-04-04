@@ -11,6 +11,7 @@ import csv
 import io
 import bcrypt
 import jwt
+import re  # Added for slug generation
 from dotenv import load_dotenv
 
 # ===================== SETUP =====================
@@ -35,8 +36,22 @@ class UserLogin(BaseModel):
 
 class CategoryCreate(BaseModel):
     name: str
-    slug: str
+    slug: Optional[str] = None  # Changed to Optional
+    icon: Optional[str] = "Tag" # Added for UI icons
     description: Optional[str] = None
+
+    # Automatically generate slug if missing
+    @validator('slug', pre=True, always=True)
+    def generate_slug(cls, v, values):
+        if v:
+            return v
+        if 'name' in values:
+            name = values['name']
+            slug = name.lower().strip()
+            slug = re.sub(r'[^a-z0-9\s-]', '', slug)
+            slug = re.sub(r'[\s-]+', '-', slug)
+            return slug
+        return None
 
 class CouponCreate(BaseModel):
     title: str
@@ -193,8 +208,11 @@ async def bulk_upload(file: UploadFile = File(...)):
         row["created_at"] = datetime.now(timezone.utc)
         
         try:
-            row["original_price"] = float(row.get("original_price", 0) or 0)
-            row["discounted_price"] = float(row.get("discounted_price", 0) or 0)
+            # Handle potential empty price strings
+            orig = row.get("original_price")
+            disc = row.get("discounted_price")
+            row["original_price"] = float(orig) if orig and str(orig).strip() else 0.0
+            row["discounted_price"] = float(disc) if disc and str(disc).strip() else 0.0
         except:
             row["original_price"] = 0.0
             row["discounted_price"] = 0.0
@@ -238,5 +256,5 @@ async def startup():
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run (app, host="0.0.0.0", port=port)
     
