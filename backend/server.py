@@ -70,7 +70,6 @@ def create_access_token(user_id: str, email: str):
 
 @api_router.get("/auth/me")
 async def get_me():
-    # Placeholder for frontend auth checks
     return {"email": "disccartindia@gmail.com", "role": "admin"}
 
 @api_router.post("/auth/login")
@@ -95,7 +94,7 @@ async def get_analytics():
         "total_categories": await db.categories.count_documents({})
     }
 
-# --- CATEGORIES ---
+# --- CATEGORIES (Fixes Add/Delete Issue) ---
 @api_router.get("/categories")
 async def get_categories():
     cats = await db.categories.find().to_list(100)
@@ -111,18 +110,23 @@ async def add_cat(data: CategoryCreate):
 
 @api_router.delete("/categories/{cat_id}")
 async def delete_cat(cat_id: str):
-    await db.categories.delete_one({"_id": ObjectId(cat_id)})
-    return {"message": "Deleted"}
+    try:
+        await db.categories.delete_one({"_id": ObjectId(cat_id)})
+        return {"message": "Deleted"}
+    except:
+        raise HTTPException(status_code=400, detail="Invalid ID format")
 
 # --- COUPONS / DEALS ---
 @api_router.get("/coupons")
 @api_router.get("/coupons-only")
 async def get_coupons(category: Optional[str] = None, isAdmin: bool = False):
-    # If not admin, only show active deals. If category is picked, filter by it.
     query = {}
+    # If it's a regular user on a phone, only show active ones
     if not isAdmin:
         query["is_active"] = True
-    if category and category != "All":
+    
+    # Handle category filtering
+    if category and category != "All" and category != "undefined":
         query["category_name"] = category
 
     coupons = await db.coupons.find(query).sort("created_at", -1).to_list(1000)
@@ -150,15 +154,16 @@ async def delete_coupon(coupon_id: str):
     await db.coupons.delete_one({"_id": ObjectId(coupon_id)})
     return {"status": "deleted"}
 
-# --- CLICK TRACKING (Fixes 404 in your screenshot) ---
 @api_router.post("/clicks")
 async def track_click(request: Request):
-    data = await request.json()
-    data["timestamp"] = datetime.now(timezone.utc)
-    await db.clicks.insert_one(data)
-    return {"status": "tracked"}
+    try:
+        data = await request.json()
+        data["timestamp"] = datetime.now(timezone.utc)
+        await db.clicks.insert_one(data)
+        return {"status": "tracked"}
+    except:
+        return {"status": "error"}
 
-# --- BULK UPLOAD ---
 @api_router.post("/coupons/bulk-upload")
 async def bulk_upload(file: UploadFile = File(...)):
     content = await file.read()
@@ -167,7 +172,6 @@ async def bulk_upload(file: UploadFile = File(...)):
     for row in reader:
         row["is_active"] = True
         row["created_at"] = datetime.now(timezone.utc)
-        # Ensure prices are numbers
         try:
             row["original_price"] = float(row.get("original_price", 0))
             row["discounted_price"] = float(row.get("discounted_price", 0))
@@ -181,10 +185,19 @@ async def bulk_upload(file: UploadFile = File(...)):
 
 app.include_router(api_router, prefix="/api")
 
-# Broad CORS for development and production stability
+# CRITICAL FIX: If using credentials, you cannot use "*"
+# Update this list with your actual Vercel URL
+origins = [
+    "https://disccart.in",
+    "https://www.disccart.in",
+    "https://disccart-frontend.vercel.app", # Replace with your actual vercel link
+    "http://localhost:5173",
+    "http://localhost:3000"
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # Allows phone and web to connect
+    allow_origins=origins, 
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -193,7 +206,6 @@ app.add_middleware(
 @app.on_event("startup")
 async def startup():
     admin_email = "disccartindia@gmail.com"
-    # Create Admin if not exists
     user = await db.users.find_one({"email": admin_email})
     if not user:
         await db.users.insert_one({
@@ -202,11 +214,9 @@ async def startup():
             "role": "admin", 
             "created_at": datetime.now(timezone.utc)
         })
-        logger.info("Admin user created.")
 
 if __name__ == "__main__":
     import uvicorn
-    # Use port from environment (Render needs this)
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
     
