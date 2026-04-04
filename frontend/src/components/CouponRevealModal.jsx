@@ -13,28 +13,41 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
 
   const hasCode = deal?.code && deal.code.trim() !== '';
 
+  // --- IMPROVED REDIRECT LOGIC ---
   const handleRedirect = useCallback(async () => {
-    if (!deal) return;
+    if (!deal || !deal.affiliate_url) return;
     
-    // Track affiliate click
-    trackAffiliateClick(deal.id, deal.brand_name, deal.affiliate_url);
+    // Ensure URL is absolute for mobile safety
+    let finalUrl = deal.affiliate_url.trim();
+    if (!finalUrl.startsWith('http')) {
+      finalUrl = `https://${finalUrl}`;
+    }
+
+    // Track events
+    trackAffiliateClick(deal.id || deal._id, deal.brand_name, finalUrl);
     
     try {
-      await trackClick(deal.id, 'web');
+      // Fire and forget tracking so it doesn't slow down the user
+      trackClick(deal.id || deal._id, 'web').catch(() => {});
     } catch (error) {
-      console.error('Failed to track click:', error);
+      console.error('Tracking failed');
     }
     
-    window.open(deal.affiliate_url, '_blank', 'noopener,noreferrer');
+    // Open the store
+    const newWindow = window.open(finalUrl, '_blank', 'noopener,noreferrer');
+    
+    // FALLBACK: If mobile browser blocks the popup, use the current tab
+    if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+      window.location.href = finalUrl;
+    }
   }, [deal]);
 
+  // Handle Automatic Redirect for Codes
   useEffect(() => {
     if (!isOpen || !hasCode) return;
 
-    // Track coupon reveal
     trackCouponReveal(deal.id, deal.brand_name, deal.discount_value || 0);
 
-    // Start countdown for redirect
     setCountdown(3);
     setRedirecting(true);
 
@@ -42,7 +55,8 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          handleRedirect();
+          // Only auto-redirect if the user is still on the modal
+          if (redirecting) handleRedirect();
           return 0;
         }
         return prev - 1;
@@ -50,11 +64,11 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [isOpen, hasCode, handleRedirect, deal]);
+  }, [isOpen, hasCode, deal, handleRedirect]);
 
+  // Handle Deals WITHOUT Codes (Instant Redirect)
   useEffect(() => {
     if (isOpen && !hasCode) {
-      // For deals without code, redirect immediately
       handleRedirect();
       onClose();
     }
@@ -62,17 +76,15 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
 
   const copyToClipboard = async () => {
     if (!deal?.code) return;
-    
-    // Track copy event
     trackCouponCopy(deal.id, deal.brand_name, deal.code);
     
     try {
       await navigator.clipboard.writeText(deal.code);
       setCopied(true);
-      toast.success('Code copied to clipboard!');
+      toast.success('Code copied!');
       setTimeout(() => setCopied(false), 3000);
     } catch (error) {
-      // Fallback for older browsers
+      // Fallback
       const textarea = document.createElement('textarea');
       textarea.value = deal.code;
       document.body.appendChild(textarea);
@@ -80,8 +92,7 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
       document.execCommand('copy');
       document.body.removeChild(textarea);
       setCopied(true);
-      toast.success('Code copied to clipboard!');
-      setTimeout(() => setCopied(false), 3000);
+      toast.success('Code copied!');
     }
   };
 
@@ -106,104 +117,67 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          data-testid="coupon-modal"
         >
-          {/* Backdrop */}
           <motion.div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
             onClick={handleClose}
           />
 
-          {/* Modal */}
           <motion.div
             className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden"
             initial={{ scale: 0.9, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.9, opacity: 0, y: 20 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           >
-            {/* Close Button */}
             <button
               onClick={handleClose}
               className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 transition-colors z-10"
-              data-testid="modal-close-btn"
             >
               <X className="w-6 h-6" />
             </button>
 
-            {/* Header */}
             <div className="bg-gradient-to-r from-[#ee922c] to-[#d9811f] p-6 text-white">
-              <div className="flex items-center gap-2 mb-2">
-                <Sparkles className="w-5 h-5" />
-                <span className="text-sm font-medium opacity-90">Exclusive Code</span>
+              <div className="flex items-center gap-2 mb-1">
+                <Sparkles className="w-4 h-4" />
+                <span className="text-xs font-medium uppercase tracking-wider">Exclusive Code</span>
               </div>
               <h2 className="font-display font-bold text-2xl">{deal.brand_name}</h2>
-              <p className="text-white/80 text-sm mt-1">{deal.title}</p>
+              <p className="text-white/90 text-sm mt-1 line-clamp-1">{deal.title}</p>
             </div>
 
-            {/* Content */}
             <div className="p-6">
-              {/* Coupon Code Box */}
-              <div className="coupon-border rounded-2xl p-6 mb-6 relative">
-                <p className="text-xs text-gray-500 uppercase tracking-widest font-bold mb-2">Your Coupon Code</p>
-                <div className="flex items-center justify-between gap-4">
-                  <code className="font-display font-black text-3xl text-[#ee922c] tracking-wider select-all">
+              <div className="border-2 border-dashed border-orange-200 rounded-2xl p-6 mb-6 text-center">
+                <p className="text-[10px] text-gray-400 uppercase tracking-[0.2em] font-bold mb-3">Click to copy code</p>
+                <div 
+                  onClick={copyToClipboard}
+                  className="cursor-pointer group relative flex items-center justify-center gap-4 bg-orange-50 py-3 px-4 rounded-xl hover:bg-orange-100 transition-colors"
+                >
+                  <code className="font-display font-black text-3xl text-[#ee922c] tracking-wider">
                     {deal.code}
                   </code>
-                  <button
-                    onClick={copyToClipboard}
-                    className={`p-3 rounded-xl transition-all ${
-                      copied 
-                        ? 'bg-[#3c7b48] text-white' 
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                    data-testid="copy-code-btn"
-                  >
-                    {copied ? <Check className="w-6 h-6" /> : <Copy className="w-6 h-6" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Social Proof */}
-              <div className="text-center mb-6">
-                <p className="text-sm text-gray-600">
-                  🔥 <span className="font-bold text-[#3c7b48]">93%</span> people saved money using this
-                </p>
-              </div>
-
-              {/* Countdown / Redirect */}
-              {redirecting && countdown > 0 ? (
-                <div className="text-center mb-4">
-                  <div className="flex items-center justify-center gap-2 text-gray-600">
-                    <Clock className="w-4 h-4 animate-pulse" />
-                    <span className="text-sm">Redirecting in <span className="font-bold text-[#ee922c]">{countdown}</span> seconds...</span>
+                  <div className={`p-2 rounded-lg ${copied ? 'bg-green-500 text-white' : 'text-orange-400'}`}>
+                    {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
                   </div>
                 </div>
-              ) : null}
-
-              {/* CTA Button */}
-              <button
-                onClick={handleRedirect}
-                className="w-full bg-[#3c7b48] hover:bg-[#2d6339] text-white font-bold rounded-xl px-6 py-4 flex items-center justify-center gap-2 transition-all"
-                data-testid="go-to-store-btn"
-              >
-                <ExternalLink className="w-5 h-5" />
-                <span>Go to {deal.brand_name}</span>
-              </button>
-
-              {/* Tips */}
-              <div className="mt-4 p-3 bg-orange-50 rounded-xl">
-                <p className="text-xs text-orange-700">
-                  💡 <strong>Tip:</strong> Apply the code at checkout before payment to get your discount!
-                </p>
               </div>
 
-              {/* Share Buttons */}
+              {redirecting && countdown > 0 && (
+                <div className="flex items-center justify-center gap-2 text-gray-500 mb-6 bg-gray-50 py-2 rounded-full">
+                  <Clock className="w-4 h-4 animate-spin" />
+                  <span className="text-xs">Redirecting to store in <strong>{countdown}s</strong></span>
+                </div>
+              )}
+
+              <button
+                onClick={handleRedirect}
+                className="w-full bg-[#3c7b48] hover:bg-[#2d6339] text-white font-bold rounded-xl px-6 py-4 flex items-center justify-center gap-2 shadow-lg shadow-green-900/10 active:scale-[0.98] transition-all"
+              >
+                <ExternalLink className="w-5 h-5" />
+                <span>Go to {deal.brand_name} Store</span>
+              </button>
+
               <div className="mt-6 pt-4 border-t border-gray-100">
-                <p className="text-center text-sm text-gray-500 mb-3">Share this deal with friends</p>
+                <p className="text-center text-[11px] text-gray-400 font-medium mb-3 uppercase tracking-wider">Share this deal</p>
                 <ShareButtonsFull deal={deal} />
               </div>
             </div>
