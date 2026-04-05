@@ -3,8 +3,8 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Tag, Upload, Link2, FileText, BookOpen,
-  Plus, Pencil, Trash2, Check, X, Loader2, FileSpreadsheet,
-  AlertCircle, ExternalLink, Copy, Eye, ImagePlus, Sparkles
+  Plus, Pencil, Trash2, X, Loader2, FileSpreadsheet,
+  ExternalLink, ImagePlus, Search, Globe, Eye, EyeOff
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -16,12 +16,12 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from '../components/ui/table';
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
 } from '../components/ui/dialog';
 import {
   getCoupons, createCoupon, updateCoupon, deleteCoupon,
   bulkUploadCoupons, getAnalyticsOverview, getCategories,
-  createCategory, updateCategory, deleteCategory,
+  createCategory, deleteCategory,
   getPrettyLinks, createPrettyLink, updatePrettyLink, deletePrettyLink,
   getPages, createPage, updatePage, deletePage,
   getBlogPosts, createBlogPost, updateBlogPost, deleteBlogPost,
@@ -33,7 +33,6 @@ export default function AdminPage() {
   const { isAuthenticated, isAdmin, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
 
-  // Data States
   const [coupons, setCoupons] = useState([]);
   const [categories, setCategories] = useState([]);
   const [prettyLinks, setPrettyLinks] = useState([]);
@@ -42,20 +41,22 @@ export default function AdminPage() {
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Dialog States
+  // Search
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Dialogs
   const [showCouponDialog, setShowCouponDialog] = useState(false);
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
   const [showLinkDialog, setShowLinkDialog] = useState(false);
+  const [showPageDialog, setShowPageDialog] = useState(false);
+  const [showBlogDialog, setShowBlogDialog] = useState(false);
 
-  // Edit State
   const [editingItem, setEditingItem] = useState(null);
   const fileInputRef = useRef(null);
   const [uploadStatus, setUploadStatus] = useState(null);
 
   useEffect(() => {
-    if (isAdmin) {
-      fetchData();
-    }
+    if (isAdmin) fetchData();
   }, [isAdmin]);
 
   const fetchData = async () => {
@@ -69,7 +70,6 @@ export default function AdminPage() {
         getPages().catch(() => []),
         getBlogPosts(false).catch(() => [])
       ]);
-
       setCoupons(couponsData || []);
       setAnalytics(analyticsData);
       setCategories(categoriesData || []);
@@ -78,20 +78,15 @@ export default function AdminPage() {
       setBlogPosts(blogData || []);
     } catch (error) {
       console.error(error);
-      toast.error('Failed to load administrative data');
+      toast.error('Failed to load data');
     } finally {
       setLoading(false);
     }
   };
 
   if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="w-10 h-10 animate-spin text-[#ee922c]" />
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="w-10 h-10 animate-spin text-[#ee922c]" /></div>;
   }
-
   if (!isAuthenticated || !isAdmin) {
     return <Navigate to="/login" replace />;
   }
@@ -99,35 +94,44 @@ export default function AdminPage() {
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     setUploadStatus({ loading: true, message: 'Processing CSV...' });
     try {
       await bulkUploadCoupons(file);
       setUploadStatus({ loading: false, success: true, message: 'Bulk Upload Successful' });
       toast.success('Inventory updated successfully');
       fetchData();
-    } catch (err) {
+    } catch {
       setUploadStatus({ loading: false, success: false, message: 'Upload Failed' });
       toast.error('CSV format incorrect');
     }
   };
 
   const handleDelete = async (type, id, name) => {
-    if (!window.confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) return;
-
+    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
     try {
       if (type === 'coupon') await deleteCoupon(id);
       if (type === 'category') await deleteCategory(id);
       if (type === 'link') await deletePrettyLink(id);
       if (type === 'page') await deletePage(id);
       if (type === 'blog') await deleteBlogPost(id);
-
       toast.success('Item removed');
       fetchData();
-    } catch (error) {
-      toast.error('Delete operation failed');
+    } catch {
+      toast.error('Delete failed');
     }
   };
+
+  // Filtered coupons for search
+  const filteredCoupons = coupons.filter(c => {
+    if (!searchTerm.trim()) return true;
+    const q = searchTerm.toLowerCase();
+    return (
+      (c.title || '').toLowerCase().includes(q) ||
+      (c.brand_name || '').toLowerCase().includes(q) ||
+      (c.code || '').toLowerCase().includes(q) ||
+      (c.category_name || '').toLowerCase().includes(q)
+    );
+  });
 
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -142,21 +146,18 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-gray-50/50 pb-20 md:pb-10" data-testid="admin-page">
       <AdminSEO />
-
       <div className="max-w-7xl mx-auto px-4 py-8">
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-10">
           <div>
             <h1 className="text-4xl font-black text-gray-900 tracking-tight">Admin Control Center</h1>
             <p className="text-gray-500 mt-1">Manage deals, categories, and site content</p>
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={fetchData} disabled={loading} data-testid="refresh-data-btn">
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Refresh Data'}
-            </Button>
-          </div>
+          <Button variant="outline" onClick={fetchData} disabled={loading} data-testid="refresh-data-btn">
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Refresh Data'}
+          </Button>
         </header>
 
-        {/* Navigation Tabs */}
+        {/* Tabs */}
         <div className="flex flex-wrap gap-2 mb-8 bg-white p-2 rounded-2xl border shadow-sm">
           {tabs.map((item) => (
             <Button
@@ -172,11 +173,11 @@ export default function AdminPage() {
           ))}
         </div>
 
-        {/* Dynamic Content Area */}
+        {/* Content */}
         <div className="bg-white rounded-3xl border shadow-sm min-h-[500px] overflow-hidden">
           <AnimatePresence mode="wait">
 
-            {/* DASHBOARD TAB */}
+            {/* DASHBOARD */}
             {activeTab === 'dashboard' && (
               <motion.div key="dashboard" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-8 space-y-8">
                 <h2 className="text-2xl font-bold" data-testid="dashboard-heading">Overview</h2>
@@ -196,22 +197,44 @@ export default function AdminPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center h-32">
-                    <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
-                  </div>
+                  <div className="flex items-center justify-center h-32"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>
                 )}
               </motion.div>
             )}
 
-            {/* DEALS TAB */}
+            {/* DEALS & COUPONS */}
             {activeTab === 'coupons' && (
               <motion.div key="coupons" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 space-y-6">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <h2 className="text-2xl font-bold">Deal Inventory</h2>
                   <Button onClick={() => { setEditingItem(null); setShowCouponDialog(true); }} className="bg-[#ee922c] hover:bg-[#d9811f]" data-testid="add-deal-btn">
                     <Plus className="w-4 h-4 mr-2" /> Add New Deal
                   </Button>
                 </div>
+
+                {/* Search Bar */}
+                <div className="relative" data-testid="deal-search-wrapper">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    placeholder="Search by title, brand, code, or category..."
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="pl-10 h-12 rounded-xl"
+                    data-testid="deal-search-input"
+                  />
+                  {searchTerm && (
+                    <button onClick={() => setSearchTerm('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+
+                {searchTerm && (
+                  <p className="text-sm text-gray-500" data-testid="search-results-count">
+                    {filteredCoupons.length} result{filteredCoupons.length !== 1 ? 's' : ''} for "{searchTerm}"
+                  </p>
+                )}
+
                 <Table data-testid="deals-table">
                   <TableHeader>
                     <TableRow>
@@ -224,7 +247,7 @@ export default function AdminPage() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {coupons.map((c) => (
+                    {filteredCoupons.map((c) => (
                       <TableRow key={c.id}>
                         <TableCell>
                           <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden border">
@@ -245,15 +268,15 @@ export default function AdminPage() {
                         </TableCell>
                       </TableRow>
                     ))}
-                    {coupons.length === 0 && (
-                      <TableRow><TableCell colSpan={6} className="text-center py-12 text-gray-400">No deals found. Add your first deal above.</TableCell></TableRow>
+                    {filteredCoupons.length === 0 && (
+                      <TableRow><TableCell colSpan={6} className="text-center py-12 text-gray-400">{searchTerm ? 'No deals match your search.' : 'No deals found. Add your first deal above.'}</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
               </motion.div>
             )}
 
-            {/* CATEGORIES TAB */}
+            {/* CATEGORIES */}
             {activeTab === 'categories' && (
               <motion.div key="categories" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 space-y-6">
                 <div className="flex justify-between items-center">
@@ -278,21 +301,14 @@ export default function AdminPage() {
               </motion.div>
             )}
 
-            {/* UPLOAD TAB */}
+            {/* BULK IMPORT */}
             {activeTab === 'upload' && (
               <motion.div key="upload" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 space-y-6">
                 <h2 className="text-2xl font-bold">Bulk Import Deals</h2>
                 <div className="border-2 border-dashed rounded-3xl p-12 text-center" data-testid="bulk-upload-zone">
                   <FileSpreadsheet className="w-12 h-12 text-gray-300 mx-auto mb-4" />
                   <p className="text-gray-500 mb-4">Upload a CSV file with your deal inventory</p>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept=".csv"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                    data-testid="csv-file-input"
-                  />
+                  <input ref={fileInputRef} type="file" accept=".csv" onChange={handleFileUpload} className="hidden" data-testid="csv-file-input" />
                   <Button onClick={() => fileInputRef.current?.click()} className="bg-[#ee922c] hover:bg-[#d9811f]" data-testid="upload-csv-btn">
                     <Upload className="w-4 h-4 mr-2" /> Choose CSV File
                   </Button>
@@ -306,51 +322,133 @@ export default function AdminPage() {
               </motion.div>
             )}
 
-            {/* PRETTY LINKS TAB */}
+            {/* PRETTY LINKS */}
             {activeTab === 'links' && (
               <motion.div key="links" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 space-y-6">
                 <div className="flex justify-between items-center">
                   <h2 className="text-2xl font-bold">Pretty Links</h2>
+                  <Button onClick={() => { setEditingItem(null); setShowLinkDialog(true); }} className="bg-[#ee922c] hover:bg-[#d9811f]" data-testid="add-link-btn">
+                    <Plus className="w-4 h-4 mr-2" /> Add Link
+                  </Button>
                 </div>
-                <div className="text-center py-12 text-gray-400">
-                  <Link2 className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <p>Pretty links management coming soon.</p>
-                  {prettyLinks.length > 0 && (
-                    <div className="mt-4 text-sm">{prettyLinks.length} links configured</div>
-                  )}
-                </div>
+                <Table data-testid="links-table">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Slug</TableHead>
+                      <TableHead>Destination</TableHead>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Clicks</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {prettyLinks.map((link) => (
+                      <TableRow key={link.id}>
+                        <TableCell className="font-mono text-sm text-blue-600">/{link.slug}</TableCell>
+                        <TableCell className="max-w-[250px] truncate text-sm text-gray-500">{link.destination_url}</TableCell>
+                        <TableCell className="font-semibold">{link.title || '-'}</TableCell>
+                        <TableCell className="font-bold text-orange-600">{link.clicks || 0}</TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-md text-xs font-bold ${link.is_active !== false ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                            {link.is_active !== false ? 'Active' : 'Inactive'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button variant="outline" size="sm" onClick={() => { setEditingItem(link); setShowLinkDialog(true); }} data-testid={`edit-link-${link.id}`}><Pencil className="w-4 h-4" /></Button>
+                          <Button variant="outline" size="sm" className="text-red-500" onClick={() => handleDelete('link', link.id, link.slug)} data-testid={`delete-link-${link.id}`}><Trash2 className="w-4 h-4" /></Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {prettyLinks.length === 0 && (
+                      <TableRow><TableCell colSpan={6} className="text-center py-12 text-gray-400">No pretty links yet. Create your first one above.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
               </motion.div>
             )}
 
-            {/* PAGES TAB */}
+            {/* PAGES */}
             {activeTab === 'pages' && (
               <motion.div key="pages" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 space-y-6">
                 <div className="flex justify-between items-center">
                   <h2 className="text-2xl font-bold">Static Pages</h2>
+                  <Button onClick={() => { setEditingItem(null); setShowPageDialog(true); }} className="bg-[#ee922c] hover:bg-[#d9811f]" data-testid="add-page-btn">
+                    <Plus className="w-4 h-4 mr-2" /> Add Page
+                  </Button>
                 </div>
-                <div className="text-center py-12 text-gray-400">
-                  <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <p>Pages CMS coming soon.</p>
-                  {pages.length > 0 && (
-                    <div className="mt-4 text-sm">{pages.length} pages created</div>
-                  )}
-                </div>
+                <Table data-testid="pages-table">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Slug</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {pages.map((pg) => (
+                      <TableRow key={pg.id}>
+                        <TableCell className="font-semibold">{pg.title}</TableCell>
+                        <TableCell className="font-mono text-sm text-blue-600">/{pg.slug}</TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-md text-xs font-bold ${pg.is_published ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                            {pg.is_published ? 'Published' : 'Draft'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button variant="outline" size="sm" onClick={() => { setEditingItem(pg); setShowPageDialog(true); }} data-testid={`edit-page-${pg.id}`}><Pencil className="w-4 h-4" /></Button>
+                          <Button variant="outline" size="sm" className="text-red-500" onClick={() => handleDelete('page', pg.id, pg.title)} data-testid={`delete-page-${pg.id}`}><Trash2 className="w-4 h-4" /></Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {pages.length === 0 && (
+                      <TableRow><TableCell colSpan={4} className="text-center py-12 text-gray-400">No pages yet. Create your first one above.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
               </motion.div>
             )}
 
-            {/* BLOG TAB */}
+            {/* BLOG */}
             {activeTab === 'blog' && (
               <motion.div key="blog" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 space-y-6">
                 <div className="flex justify-between items-center">
                   <h2 className="text-2xl font-bold">Blog Posts</h2>
+                  <Button onClick={() => { setEditingItem(null); setShowBlogDialog(true); }} className="bg-[#ee922c] hover:bg-[#d9811f]" data-testid="add-blog-btn">
+                    <Plus className="w-4 h-4 mr-2" /> Add Post
+                  </Button>
                 </div>
-                <div className="text-center py-12 text-gray-400">
-                  <BookOpen className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <p>Blog management coming soon.</p>
-                  {blogPosts.length > 0 && (
-                    <div className="mt-4 text-sm">{blogPosts.length} posts published</div>
-                  )}
-                </div>
+                <Table data-testid="blog-table">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Slug</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {blogPosts.map((post) => (
+                      <TableRow key={post.id}>
+                        <TableCell className="font-semibold">{post.title}</TableCell>
+                        <TableCell className="font-mono text-sm text-blue-600">/{post.slug}</TableCell>
+                        <TableCell>
+                          <span className={`px-2 py-1 rounded-md text-xs font-bold ${post.published ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                            {post.published ? 'Published' : 'Draft'}
+                          </span>
+                        </TableCell>
+                        <TableCell className="text-right space-x-2">
+                          <Button variant="outline" size="sm" onClick={() => { setEditingItem(post); setShowBlogDialog(true); }} data-testid={`edit-blog-${post.id}`}><Pencil className="w-4 h-4" /></Button>
+                          <Button variant="outline" size="sm" className="text-red-500" onClick={() => handleDelete('blog', post.id, post.title)} data-testid={`delete-blog-${post.id}`}><Trash2 className="w-4 h-4" /></Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {blogPosts.length === 0 && (
+                      <TableRow><TableCell colSpan={4} className="text-center py-12 text-gray-400">No blog posts yet. Create your first one above.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
               </motion.div>
             )}
 
@@ -358,22 +456,20 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* 1. COUPON/DEAL DIALOG */}
+      {/* ============ DIALOGS ============ */}
+
+      {/* Coupon Dialog */}
       <Dialog open={showCouponDialog} onOpenChange={setShowCouponDialog}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black">{editingItem ? 'Edit Existing Deal' : 'Add New Deal'}</DialogTitle>
+            <DialogTitle className="text-2xl font-black">{editingItem ? 'Edit Deal' : 'Add New Deal'}</DialogTitle>
             <DialogDescription>Fill in the details below to {editingItem ? 'update this' : 'create a new'} deal or coupon.</DialogDescription>
           </DialogHeader>
-          <CouponForm
-            item={editingItem}
-            categories={categories}
-            onSuccess={() => { setShowCouponDialog(false); fetchData(); }}
-          />
+          <CouponForm item={editingItem} categories={categories} onSuccess={() => { setShowCouponDialog(false); fetchData(); }} />
         </DialogContent>
       </Dialog>
 
-      {/* 2. CATEGORY DIALOG */}
+      {/* Category Dialog */}
       <Dialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>
         <DialogContent className="rounded-3xl">
           <DialogHeader>
@@ -383,74 +479,91 @@ export default function AdminPage() {
           <CategoryForm onSuccess={() => { setShowCategoryDialog(false); fetchData(); }} />
         </DialogContent>
       </Dialog>
+
+      {/* Pretty Link Dialog */}
+      <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>
+        <DialogContent className="max-w-lg rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black">{editingItem ? 'Edit Link' : 'Add Pretty Link'}</DialogTitle>
+            <DialogDescription>Create a short branded link that redirects to your affiliate URL.</DialogDescription>
+          </DialogHeader>
+          <PrettyLinkForm item={editingItem} onSuccess={() => { setShowLinkDialog(false); setEditingItem(null); fetchData(); }} />
+        </DialogContent>
+      </Dialog>
+
+      {/* Page Dialog */}
+      <Dialog open={showPageDialog} onOpenChange={setShowPageDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black">{editingItem ? 'Edit Page' : 'Add New Page'}</DialogTitle>
+            <DialogDescription>Create or edit a static page (Privacy Policy, About Us, etc.).</DialogDescription>
+          </DialogHeader>
+          <PageForm item={editingItem} onSuccess={() => { setShowPageDialog(false); setEditingItem(null); fetchData(); }} />
+        </DialogContent>
+      </Dialog>
+
+      {/* Blog Dialog */}
+      <Dialog open={showBlogDialog} onOpenChange={setShowBlogDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-black">{editingItem ? 'Edit Post' : 'Add Blog Post'}</DialogTitle>
+            <DialogDescription>Write or edit a blog post for your site.</DialogDescription>
+          </DialogHeader>
+          <BlogForm item={editingItem} onSuccess={() => { setShowBlogDialog(false); setEditingItem(null); fetchData(); }} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
 
-/**
- * COUPON/DEAL FORM
- */
+/* ================================================================
+   COUPON FORM
+   ================================================================ */
 function CouponForm({ item, categories, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-
   const [imageUrl, setImageUrl] = useState(item?.image_url || '');
   const [filePreview, setFilePreview] = useState(item?.image_url || null);
 
   const [form, setForm] = useState(item || {
-    title: '',
-    brand_name: '',
-    category_name: '',
-    original_price: '',
-    discounted_price: '',
-    affiliate_url: '',
-    code: '',
-    is_active: true,
-    offer_type: 'coupon',
+    title: '', brand_name: '', category_name: '',
+    original_price: '', discounted_price: '',
+    affiliate_url: '', code: '', is_active: true, offer_type: 'coupon',
   });
 
   const handleFileChange = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
-
     setFilePreview(URL.createObjectURL(file));
     setUploading(true);
-
     try {
       const uploadedUrl = await uploadImage(file);
       setImageUrl(uploadedUrl);
-      toast.success('Image uploaded successfully!');
-    } catch (error) {
-      toast.error('Image upload failed. Try again.');
+      toast.success('Image uploaded!');
+    } catch {
+      toast.error('Image upload failed.');
       setFilePreview(null);
     } finally {
       setUploading(false);
     }
   };
 
-  const clearImage = () => {
-    setImageUrl('');
-    setFilePreview(null);
-  };
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
-
     const dealData = {
       ...form,
       original_price: parseFloat(form.original_price) || 0,
       discounted_price: parseFloat(form.discounted_price) || 0,
       image_url: imageUrl,
     };
-
     try {
       if (item) await updateCoupon(item.id, dealData);
       else await createCoupon(dealData);
-      toast.success('Deal changes saved');
+      toast.success('Deal saved');
       onSuccess();
     } catch (error) {
-      toast.error('Failed to save deal. Check console.');
+      toast.error('Failed to save deal');
       console.error(error);
     } finally {
       setLoading(false);
@@ -460,56 +573,30 @@ function CouponForm({ item, categories, onSuccess }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-5 pt-4" data-testid="coupon-form">
       {/* Image Upload */}
-      <div className="mb-6 space-y-2">
+      <div className="space-y-2">
         <Label className="text-xs font-bold uppercase tracking-widest text-gray-400">Deal Image</Label>
         <div className="relative group flex items-center justify-center w-full h-40 border-2 border-dashed border-gray-200 rounded-3xl hover:border-orange-400 hover:bg-orange-50/50 transition-all bg-gray-50 overflow-hidden">
           {filePreview ? (
             <>
               <img src={filePreview} alt="Preview" className="w-full h-full object-contain p-2" />
-              <button
-                type="button"
-                onClick={clearImage}
-                className="absolute top-2 right-2 bg-white/80 p-2 rounded-full shadow-lg hover:bg-white text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
-                data-testid="clear-image-btn"
-              >
-                <X size={16} />
-              </button>
+              <button type="button" onClick={() => { setImageUrl(''); setFilePreview(null); }} className="absolute top-2 right-2 bg-white/80 p-2 rounded-full shadow-lg text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" data-testid="clear-image-btn"><X size={16} /></button>
             </>
           ) : (
-            <label htmlFor="dealImageUpload" className="cursor-pointer flex flex-col items-center justify-center text-center p-6 space-y-2">
+            <label htmlFor="dealImageUpload" className="cursor-pointer flex flex-col items-center justify-center p-6 space-y-2">
               <ImagePlus size={32} className="text-gray-300 group-hover:text-orange-500" />
-              <span className="text-sm text-gray-600 group-hover:text-orange-700">
-                {uploading ? 'Uploading...' : 'Click or drag to upload deal image'}
-              </span>
-              <span className="text-xs text-gray-400">JPEG, PNG, WEBP (Max 2MB)</span>
+              <span className="text-sm text-gray-600">{uploading ? 'Uploading...' : 'Click to upload deal image'}</span>
             </label>
           )}
-
-          <input
-            id="dealImageUpload"
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="absolute inset-0 opacity-0 cursor-pointer"
-            disabled={uploading}
-            data-testid="deal-image-input"
-          />
-
-          {uploading && (
-            <div className="absolute inset-0 bg-white/80 flex items-center justify-center backdrop-blur-sm z-10 rounded-3xl">
-              <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
-            </div>
-          )}
+          <input id="dealImageUpload" type="file" accept="image/*" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" disabled={uploading} data-testid="deal-image-input" />
+          {uploading && <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-10 rounded-3xl"><Loader2 className="w-8 h-8 animate-spin text-orange-500" /></div>}
         </div>
       </div>
 
-      {/* Title */}
       <div className="space-y-2">
         <Label>Title</Label>
-        <Input placeholder="E.g. Flat 50% Off On Smartphones" value={form.title} onChange={e => setForm({...form, title: e.target.value})} required className="h-12 rounded-xl" data-testid="deal-title-input" />
+        <Input placeholder="E.g. Flat 50% Off" value={form.title} onChange={e => setForm({...form, title: e.target.value})} required className="h-12 rounded-xl" data-testid="deal-title-input" />
       </div>
 
-      {/* Prices */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Original Price</Label>
@@ -521,7 +608,6 @@ function CouponForm({ item, categories, onSuccess }) {
         </div>
       </div>
 
-      {/* Brand + Category */}
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Brand</Label>
@@ -529,59 +615,41 @@ function CouponForm({ item, categories, onSuccess }) {
         </div>
         <div className="space-y-2">
           <Label>Category</Label>
-          <select
-            className="w-full h-12 px-3 py-2 border rounded-xl text-sm bg-white"
-            value={form.category_name}
-            onChange={e => setForm({...form, category_name: e.target.value})}
-            required
-            data-testid="deal-category-select"
-          >
+          <select className="w-full h-12 px-3 py-2 border rounded-xl text-sm bg-white" value={form.category_name} onChange={e => setForm({...form, category_name: e.target.value})} required data-testid="deal-category-select">
             <option value="">Select Category</option>
-            {categories.map(cat => <option key={cat.id || cat._id} value={cat.name}>{cat.name}</option>)}
+            {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
           </select>
         </div>
       </div>
 
-      {/* Offer Type */}
       <div className="space-y-2">
         <Label>Offer Type</Label>
-        <select
-          className="w-full h-12 px-3 py-2 border rounded-xl text-sm bg-white"
-          value={form.offer_type || 'coupon'}
-          onChange={e => setForm({...form, offer_type: e.target.value})}
-          data-testid="deal-offer-type-select"
-        >
+        <select className="w-full h-12 px-3 py-2 border rounded-xl text-sm bg-white" value={form.offer_type || 'coupon'} onChange={e => setForm({...form, offer_type: e.target.value})} data-testid="deal-offer-type-select">
           <option value="coupon">Coupon</option>
           <option value="deal">Deal</option>
         </select>
       </div>
 
-      {/* Promo Code */}
       <div className="space-y-2">
         <Label>Promo Code (Optional)</Label>
         <Input placeholder="E.g. SAVE50" value={form.code} onChange={e => setForm({...form, code: e.target.value})} className="h-12 rounded-xl font-mono uppercase" data-testid="deal-code-input" />
       </div>
 
-      {/* Affiliate URL */}
       <div className="space-y-2">
         <Label>Affiliate URL</Label>
         <Input placeholder="https://..." value={form.affiliate_url} onChange={e => setForm({...form, affiliate_url: e.target.value})} required className="h-12 rounded-xl" data-testid="deal-url-input" />
       </div>
 
       <Button type="submit" className="w-full h-14 rounded-2xl bg-[#ee922c] hover:bg-[#d9811f] text-lg font-bold" disabled={loading || uploading} data-testid="save-deal-btn">
-        {loading || uploading ? (
-          <><Loader2 className="animate-spin mr-2" /> Saving...</>
-        ) : (
-          <>Save Deal Changes</>
-        )}
+        {loading || uploading ? <><Loader2 className="animate-spin mr-2" /> Saving...</> : 'Save Deal Changes'}
       </Button>
     </form>
   );
 }
 
-/**
- * CATEGORY FORM
- */
+/* ================================================================
+   CATEGORY FORM
+   ================================================================ */
 function CategoryForm({ onSuccess }) {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
@@ -591,7 +659,7 @@ function CategoryForm({ onSuccess }) {
     setLoading(true);
     try {
       await createCategory({ name });
-      toast.success('Category created successfully');
+      toast.success('Category created');
       onSuccess();
     } catch {
       toast.error('Failed to create category');
@@ -604,18 +672,199 @@ function CategoryForm({ onSuccess }) {
     <form onSubmit={handleSubmit} className="space-y-6 pt-4" data-testid="category-form">
       <div className="space-y-2">
         <Label>Category Label</Label>
-        <Input
-          placeholder="E.g., Fashion, Electronics, Food"
-          value={name}
-          onChange={e => setName(e.target.value)}
-          required
-          className="h-14 rounded-2xl"
-          data-testid="category-name-input"
-        />
-        <p className="text-xs text-gray-400">The slug will be generated automatically.</p>
+        <Input placeholder="E.g., Fashion, Electronics" value={name} onChange={e => setName(e.target.value)} required className="h-14 rounded-2xl" data-testid="category-name-input" />
+        <p className="text-xs text-gray-400">Slug will be generated automatically.</p>
       </div>
       <Button type="submit" className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 font-bold" disabled={loading} data-testid="save-category-btn">
         {loading ? <Loader2 className="animate-spin" /> : 'Confirm & Add Category'}
+      </Button>
+    </form>
+  );
+}
+
+/* ================================================================
+   PRETTY LINK FORM
+   ================================================================ */
+function PrettyLinkForm({ item, onSuccess }) {
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({
+    slug: item?.slug || '',
+    destination_url: item?.destination_url || '',
+    title: item?.title || '',
+    description: item?.description || '',
+    is_active: item?.is_active !== false,
+  });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      if (item) await updatePrettyLink(item.id, form);
+      else await createPrettyLink(form);
+      toast.success(item ? 'Link updated' : 'Link created');
+      onSuccess();
+    } catch (error) {
+      toast.error('Failed to save link');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5 pt-4" data-testid="link-form">
+      <div className="space-y-2">
+        <Label>Slug</Label>
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-400">/go/</span>
+          <Input placeholder="amazon-deals" value={form.slug} onChange={e => setForm({...form, slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-')})} required className="h-12 rounded-xl font-mono" data-testid="link-slug-input" />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label>Destination URL</Label>
+        <Input placeholder="https://www.amazon.in?tag=disccart" value={form.destination_url} onChange={e => setForm({...form, destination_url: e.target.value})} required className="h-12 rounded-xl" data-testid="link-url-input" />
+      </div>
+      <div className="space-y-2">
+        <Label>Title (optional)</Label>
+        <Input placeholder="Amazon India Deals" value={form.title} onChange={e => setForm({...form, title: e.target.value})} className="h-12 rounded-xl" data-testid="link-title-input" />
+      </div>
+      <div className="space-y-2">
+        <Label>Description (optional)</Label>
+        <Input placeholder="Short description" value={form.description} onChange={e => setForm({...form, description: e.target.value})} className="h-12 rounded-xl" data-testid="link-desc-input" />
+      </div>
+      <div className="flex items-center gap-2">
+        <input type="checkbox" id="linkActive" checked={form.is_active} onChange={e => setForm({...form, is_active: e.target.checked})} className="rounded" />
+        <Label htmlFor="linkActive" className="cursor-pointer">Active</Label>
+      </div>
+      <Button type="submit" className="w-full h-14 rounded-2xl bg-[#ee922c] hover:bg-[#d9811f] text-lg font-bold" disabled={loading} data-testid="save-link-btn">
+        {loading ? <Loader2 className="animate-spin" /> : (item ? 'Update Link' : 'Create Link')}
+      </Button>
+    </form>
+  );
+}
+
+/* ================================================================
+   PAGE FORM
+   ================================================================ */
+function PageForm({ item, onSuccess }) {
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({
+    title: item?.title || '',
+    slug: item?.slug || '',
+    meta_description: item?.meta_description || '',
+    meta_keywords: item?.meta_keywords || '',
+    content: item?.content || '',
+    is_published: item?.is_published !== false,
+  });
+
+  const autoSlug = (title) => title.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/[\s]+/g, '-');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    const payload = { ...form, slug: form.slug || autoSlug(form.title) };
+    try {
+      if (item) await updatePage(item.id, payload);
+      else await createPage(payload);
+      toast.success(item ? 'Page updated' : 'Page created');
+      onSuccess();
+    } catch (error) {
+      toast.error('Failed to save page');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5 pt-4" data-testid="page-form">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Title</Label>
+          <Input placeholder="Privacy Policy" value={form.title} onChange={e => { setForm({...form, title: e.target.value, slug: form.slug || autoSlug(e.target.value)}); }} required className="h-12 rounded-xl" data-testid="page-title-input" />
+        </div>
+        <div className="space-y-2">
+          <Label>Slug</Label>
+          <Input placeholder="privacy-policy" value={form.slug} onChange={e => setForm({...form, slug: e.target.value})} className="h-12 rounded-xl font-mono" data-testid="page-slug-input" />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label>Meta Description</Label>
+        <Input placeholder="SEO description" value={form.meta_description} onChange={e => setForm({...form, meta_description: e.target.value})} className="h-12 rounded-xl" data-testid="page-meta-input" />
+      </div>
+      <div className="space-y-2">
+        <Label>Content (Markdown)</Label>
+        <Textarea placeholder="# Page Title&#10;&#10;Write your content here..." value={form.content} onChange={e => setForm({...form, content: e.target.value})} className="min-h-[200px] rounded-xl" data-testid="page-content-input" />
+      </div>
+      <div className="flex items-center gap-2">
+        <input type="checkbox" id="pagePublished" checked={form.is_published} onChange={e => setForm({...form, is_published: e.target.checked})} className="rounded" />
+        <Label htmlFor="pagePublished" className="cursor-pointer">Published</Label>
+      </div>
+      <Button type="submit" className="w-full h-14 rounded-2xl bg-[#ee922c] hover:bg-[#d9811f] text-lg font-bold" disabled={loading} data-testid="save-page-btn">
+        {loading ? <Loader2 className="animate-spin" /> : (item ? 'Update Page' : 'Create Page')}
+      </Button>
+    </form>
+  );
+}
+
+/* ================================================================
+   BLOG FORM
+   ================================================================ */
+function BlogForm({ item, onSuccess }) {
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({
+    title: item?.title || '',
+    slug: item?.slug || '',
+    content: item?.content || '',
+    meta_description: item?.meta_description || '',
+    published: item?.published !== false,
+  });
+
+  const autoSlug = (title) => title.toLowerCase().trim().replace(/[^a-z0-9\s-]/g, '').replace(/[\s]+/g, '-');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    const payload = { ...form, slug: form.slug || autoSlug(form.title) };
+    try {
+      if (item) await updateBlogPost(item.id, payload);
+      else await createBlogPost(payload);
+      toast.success(item ? 'Post updated' : 'Post created');
+      onSuccess();
+    } catch (error) {
+      toast.error('Failed to save post');
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5 pt-4" data-testid="blog-form">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Title</Label>
+          <Input placeholder="10 Best Shopping Hacks" value={form.title} onChange={e => { setForm({...form, title: e.target.value, slug: form.slug || autoSlug(e.target.value)}); }} required className="h-12 rounded-xl" data-testid="blog-title-input" />
+        </div>
+        <div className="space-y-2">
+          <Label>Slug</Label>
+          <Input placeholder="10-best-shopping-hacks" value={form.slug} onChange={e => setForm({...form, slug: e.target.value})} className="h-12 rounded-xl font-mono" data-testid="blog-slug-input" />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label>Meta Description</Label>
+        <Input placeholder="Brief SEO summary" value={form.meta_description} onChange={e => setForm({...form, meta_description: e.target.value})} className="h-12 rounded-xl" data-testid="blog-meta-input" />
+      </div>
+      <div className="space-y-2">
+        <Label>Content (Markdown)</Label>
+        <Textarea placeholder="# Blog Post&#10;&#10;Write your post here..." value={form.content} onChange={e => setForm({...form, content: e.target.value})} className="min-h-[200px] rounded-xl" data-testid="blog-content-input" />
+      </div>
+      <div className="flex items-center gap-2">
+        <input type="checkbox" id="blogPublished" checked={form.published} onChange={e => setForm({...form, published: e.target.checked})} className="rounded" />
+        <Label htmlFor="blogPublished" className="cursor-pointer">Published</Label>
+      </div>
+      <Button type="submit" className="w-full h-14 rounded-2xl bg-[#ee922c] hover:bg-[#d9811f] text-lg font-bold" disabled={loading} data-testid="save-blog-btn">
+        {loading ? <Loader2 className="animate-spin" /> : (item ? 'Update Post' : 'Create Post')}
       </Button>
     </form>
   );
