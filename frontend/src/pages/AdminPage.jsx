@@ -347,175 +347,195 @@ export default function AdminPage() {
     </div>
   );
 }
+// Find and replace the function CouponForm({ ... }) { ... } in AdminPage.jsx with this:
 
-/**
- * FULL COUPON FORM COMPONENT
- * Includes Image Upload with Preview
- */
 function CouponForm({ item, categories, onSuccess }) {
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false); // State to show image upload progress
+  
+  // 1. New State for Image Handling
+  const [imageUrl, setImageUrl] = useState(item?.image_url || ''); // Stores the final URL to save
+  const [filePreview, setFilePreview] = useState(item?.image_url || null); // For local preview
+
+  // Standard Form State
   const [form, setForm] = useState(item || { 
     title: '', 
     brand_name: '', 
     category_name: '', 
     original_price: '', 
     discounted_price: '', 
-    affiliate_url: '', 
-    image_url: '',
-    code: '',
+    affiliate_url: '',
+    code: '', // Preserve existing fields
     is_active: true
   });
   
-  const [uploading, setUploading] = useState(false);
-
-  const handleImageChange = async (e) => {
-    const file = e.target.files[0];
+  // 2. Handle File Selection and Upload
+  const handleFileChange = async (event) => {
+    const file = event.target.files[0];
     if (!file) return;
 
+    // Show a local preview instantly for better UX
+    setFilePreview(URL.createObjectURL(file));
     setUploading(true);
+
     try {
-      const secureUrl = await uploadImage(file);
-      setForm({ ...form, image_url: secureUrl });
-      toast.success('Image ready');
-    } catch (err) {
-      toast.error('Image upload failed');
+      // Send the file to our new API function from Step 1
+      const uploadedUrl = await uploadImage(file);
+      // Update the state with the permanent URL from the server
+      setImageUrl(uploadedUrl);
+      toast.success('Image uploaded successfully!');
+    } catch (error) {
+      toast.error('Image upload failed. Try again.');
+      setFilePreview(null); // Clear preview on error
     } finally {
       setUploading(false);
     }
   };
 
+  const clearImage = () => {
+    setImageUrl('');
+    setFilePreview(null);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
+
+    const dealData = {
+      ...form, // Keep all standard form data
+      
+      // Convert prices to numbers, or default to 0
+      original_price: parseFloat(form.original_price) || 0,
+      discounted_price: parseFloat(form.discounted_price) || 0,
+      
+      // 3. Include the finalized Image URL in the payload
+      image_url: imageUrl, 
+    };
+
     try {
-      if (item) await updateCoupon(item.id, form);
-      else await createCoupon(form);
-      toast.success('Inventory updated');
+      if (item) await updateCoupon(item.id, dealData);
+      else await createCoupon(dealData);
+      toast.success('Deal changes saved');
       onSuccess();
-    } catch {
-      toast.error('Operation failed');
+    } catch (error) {
+      toast.error('Failed to save deal. Check console.');
+      console.error(error);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 pt-4">
+    <form onSubmit={handleSubmit} className="space-y-5 pt-4">
       
-      {/* Visual Image Selector */}
-      <div className="space-y-3">
+      {/* =============================================================== */}
+      {/* VISUAL IMAGE UPLOAD SECTION (The fix you requested) */}
+      {/* =============================================================== */}
+      <div className="mb-6 space-y-2">
         <Label className="text-xs font-bold uppercase tracking-widest text-gray-400">Deal Image</Label>
-        <div className="flex items-center gap-6 p-4 border-2 border-dashed rounded-3xl bg-gray-50 hover:bg-gray-100 transition-colors">
-          <div className="w-32 h-24 rounded-2xl bg-white border flex items-center justify-center overflow-hidden shadow-sm">
-            {form.image_url ? (
-              <img src={form.image_url} alt="Preview" className="w-full h-full object-cover" />
-            ) : (
-              <ImagePlus className="text-gray-200 w-10 h-10" />
-            )}
-          </div>
-          <div className="flex-1">
-            <input 
-              type="file" 
-              id="deal-image-input"
-              className="hidden" 
-              accept="image/*" 
-              onChange={handleImageChange} 
-            />
-            <Label 
-              htmlFor="deal-image-input" 
-              className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-white border rounded-xl font-bold text-sm shadow-sm hover:shadow-md transition-all"
-            >
-              {uploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
-              {form.image_url ? 'Change Image' : 'Upload Image'}
-            </Label>
-            <p className="text-[10px] text-gray-400 mt-2">Recommended: 4:3 aspect ratio, max 2MB</p>
-          </div>
+        
+        {/* Dotted upload box */}
+        <div className="relative group flex items-center justify-center w-full h-40 border-2 border-dashed border-gray-200 rounded-3xl hover:border-orange-400 hover:bg-orange-50/50 transition-all bg-gray-50 overflow-hidden">
+          
+          {filePreview ? (
+            // If image is selected, show preview with a delete button
+            <>
+              <img src={filePreview} alt="Preview" className="w-full h-full object-contain p-2" />
+              <button
+                type="button"
+                onClick={clearImage}
+                className="absolute top-2 right-2 bg-white/80 p-2 rounded-full shadow-lg hover:bg-white text-red-500 hover:text-red-700 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X size={16} />
+              </button>
+            </>
+          ) : (
+            // If no image, show the upload icon
+            <label htmlFor="dealImageUpload" className="cursor-pointer flex flex-col items-center justify-center text-center p-6 space-y-2">
+              <ImagePlus size={32} className="text-gray-300 group-hover:text-orange-500" />
+              <span className="text-sm text-gray-600 group-hover:text-orange-700">
+                {uploading ? 'Uploading...' : 'Click or drag to upload deal image'}
+              </span>
+              <span className="text-xs text-gray-400">JPEG, PNG, WEBP (Max 2MB)</span>
+            </label>
+          )}
+
+          {/* Hidden File Input (Actual functionality) */}
+          <input
+            id="dealImageUpload"
+            type="file"
+            accept="image/*"
+            onChange={handleFileChange}
+            className="absolute inset-0 opacity-0 cursor-pointer"
+            disabled={uploading} // Prevent uploading another while one is in progress
+          />
+
+          {/* Loading Overlay */}
+          {uploading && (
+            <div className="absolute inset-0 bg-white/80 flex items-center justify-center backdrop-blur-sm z-10 rounded-3xl">
+              <Loader2 className="w-8 h-8 animate-spin text-orange-500" />
+            </div>
+          )}
         </div>
       </div>
+      {/* =============================================================== */}
 
+      {/* Rest of the form remains unchanged */}
       <div className="space-y-2">
-        <Label>Title / Headline</Label>
-        <Input 
-          placeholder="E.g., Flat 50% Off on Nike Shoes" 
-          value={form.title} 
-          onChange={e => setForm({...form, title: e.target.value})} 
-          required 
-          className="h-12 rounded-xl"
-        />
+        <Label>Title</Label>
+        <Input placeholder="E.g. Flat 50% Off On Smartphones" value={form.title} onChange={e => setForm({...form, title: e.target.value})} required className="h-12 rounded-xl" />
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Original Price (₹)</Label>
-          <Input 
-            type="number" 
-            placeholder="0.00" 
-            value={form.original_price} 
-            onChange={e => setForm({...form, original_price: e.target.value})} 
-            className="h-12 rounded-xl"
-          />
+          <Input type="number" placeholder="0" value={form.original_price} onChange={e => setForm({...form, original_price: e.target.value})} className="h-12 rounded-xl" />
         </div>
         <div className="space-y-2">
-          <Label>Offer Price (₹)</Label>
-          <Input 
-            type="number" 
-            placeholder="0.00" 
-            value={form.discounted_price} 
-            onChange={e => setForm({...form, discounted_price: e.target.value})} 
-            className="h-12 rounded-xl"
-          />
+          <Label>Discounted Price (₹)</Label>
+          <Input type="number" placeholder="0" value={form.discounted_price} onChange={e => setForm({...form, discounted_price: e.target.value})} className="h-12 rounded-xl" />
         </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label>Brand Name</Label>
-          <Input 
-            placeholder="Amazon, Flipkart, etc." 
-            value={form.brand_name} 
-            onChange={e => setForm({...form, brand_name: e.target.value})} 
-            required 
-            className="h-12 rounded-xl"
-          />
+          <Label>Brand</Label>
+          <Input placeholder="Amazon, Myntra..." value={form.brand_name} onChange={e => setForm({...form, brand_name: e.target.value})} required className="h-12 rounded-xl" />
         </div>
         <div className="space-y-2">
-          <Label>Select Category</Label>
+          <Label>Category</Label>
           <select 
-            className="w-full h-12 px-4 py-2 border rounded-xl text-sm bg-white focus:ring-2 ring-[#ee922c]/20 outline-none" 
+            className="w-full h-12 px-3 py-2 border rounded-xl text-sm bg-white" 
             value={form.category_name} 
             onChange={e => setForm({...form, category_name: e.target.value})}
             required
           >
-            <option value="">-- Choose --</option>
-            {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
+            <option value="">Select Category</option>
+            {categories.map(cat => <option key={cat.id || cat._id} value={cat.name}>{cat.name}</option>)}
           </select>
         </div>
       </div>
 
       <div className="space-y-2">
         <Label>Promo Code (Optional)</Label>
-        <Input 
-          placeholder="Leave empty if it's a direct deal" 
-          value={form.code} 
-          onChange={e => setForm({...form, code: e.target.value})} 
-          className="h-12 rounded-xl font-mono uppercase"
-        />
+        <Input placeholder="E.g. SAVE50" value={form.code} onChange={e => setForm({...form, code: e.target.value})} className="h-12 rounded-xl font-mono uppercase" />
       </div>
 
       <div className="space-y-2">
-        <Label>Redirect URL (Affiliate Link)</Label>
-        <Input 
-          placeholder="https://..." 
-          value={form.affiliate_url} 
-          onChange={e => setForm({...form, affiliate_url: e.target.value})} 
-          required 
-          className="h-12 rounded-xl"
-        />
+        <Label>Affiliate URL</Label>
+        <Input placeholder="https://..." value={form.affiliate_url} onChange={e => setForm({...form, affiliate_url: e.target.value})} required className="h-12 rounded-xl" />
       </div>
 
-      <Button type="submit" className="w-full h-14 rounded-2xl bg-[#ee922c] hover:bg-[#d9811f] text-lg font-bold shadow-lg shadow-orange-500/20" disabled={uploading}>
-        {uploading ? 'Processing Image...' : 'Save & Publish Deal'}
+      <Button type="submit" className="w-full h-14 rounded-2xl bg-[#ee922c] hover:bg-[#d9811f] text-lg font-bold" disabled={loading || uploading}>
+        {loading || uploading ? (
+          <><Loader2 className="animate-spin mr-2" /> Saving...</>
+        ) : (
+          <>Save Deal Changes</>
+        )}
       </Button>
     </form>
   );
 }
-
 /**
  * SIMPLE CATEGORY FORM
  */

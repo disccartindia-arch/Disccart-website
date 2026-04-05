@@ -1,3 +1,41 @@
+// Paste this inside src/lib/api.js
+// If you don't already have axios imported, add this at the very top:
+// import axios from 'axios';
+
+// Ensure you use your dynamic env variable for the URL
+const API_URL = import.meta.env.VITE_API_URL || 'https://disccart-api.onrender.com/api';
+
+const api = axios.create({
+  baseURL: API_URL,
+});
+
+/**
+ * =====================
+ * NEW: Image Upload API
+ * =====================
+ * Uploads a file to the backend's image handling endpoint.
+ * Assuming your backend has an endpoint: POST /api/upload-image
+ */
+export const uploadImage = async (file) => {
+  const formData = new FormData();
+  formData.append('image', file); // The backend expects the key to be 'image'
+
+  try {
+    const response = await api.post('/upload-image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data', // Crucial for file uploads
+      },
+    });
+    
+    // We assume your backend returns { url: "https://.../your-image.jpg" }
+    return response.data.url; 
+  } catch (error) {
+    console.error('Failed to upload image:', error);
+    throw error;
+  }
+};
+
+// ... keep all other existing functions below this line
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_BACKEND_URL;
