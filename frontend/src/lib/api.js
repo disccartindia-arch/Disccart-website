@@ -33,7 +33,25 @@ api.interceptors.response.use(
   }
 );
 
-// Coupons
+// ===================== NEW: IMAGE UPLOAD =====================
+/**
+ * Uploads a single image file to the backend
+ * @param {File} file - The image file from an input field
+ * @returns {Promise<string>} - Returns the URL of the uploaded image
+ */
+export const uploadImage = async (file) => {
+  const formData = new FormData();
+  formData.append('image', file);
+
+  const { data } = await api.post('/upload-image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+  
+  // Assuming your backend returns { url: "..." }
+  return data.url;
+};
+
+// ===================== COUPONS =====================
 export const getCoupons = async (params = {}) => {
   const { data } = await api.get('/coupons', { params });
   return data;
@@ -68,10 +86,10 @@ export const bulkUploadCoupons = async (file) => {
   return data;
 };
 
-// Categories
+// ===================== CATEGORIES =====================
 export const getCategories = async () => {
   const { data } = await api.get('/categories');
-  return data;
+  return Array.isArray(data) ? data : []; // Safety check for mobile
 };
 
 export const getCategory = async (id) => {
@@ -94,7 +112,7 @@ export const deleteCategory = async (id) => {
   return data;
 };
 
-// Brands
+// ===================== BRANDS =====================
 export const getBrands = async () => {
   const { data } = await api.get('/brands');
   return data;
@@ -105,13 +123,12 @@ export const createBrand = async (brandData) => {
   return data;
 };
 
-// Click tracking
+// ===================== TRACKING & ANALYTICS =====================
 export const trackClick = async (couponId, source = 'web') => {
   const { data } = await api.post('/clicks', { coupon_id: couponId, source });
   return data;
 };
 
-// Analytics
 export const getAnalyticsOverview = async () => {
   const { data } = await api.get('/analytics/overview');
   return data;
@@ -122,25 +139,23 @@ export const getClickAnalytics = async (days = 7) => {
   return data;
 };
 
-// SEO Pages
+// ===================== SEO & AI =====================
 export const getSeoPageData = async (pageType) => {
   const { data } = await api.get(`/seo/${pageType}`);
   return data;
 };
 
-// AI Content
 export const generateAIContent = async (contentData) => {
   const { data } = await api.post('/ai/generate-content', contentData);
   return data;
 };
 
-// Coupons Only (with codes)
+// ===================== ADDITIONAL FEATURES =====================
 export const getCouponsOnly = async (params = {}) => {
   const { data } = await api.get('/coupons-only', { params });
   return data;
 };
 
-// Pretty Links
 export const getPrettyLinks = async () => {
   const { data } = await api.get('/pretty-links');
   return data;
@@ -161,7 +176,7 @@ export const deletePrettyLink = async (id) => {
   return data;
 };
 
-// Pages (CMS)
+// ===================== CMS & BLOG =====================
 export const getPages = async (publishedOnly = false) => {
   const { data } = await api.get('/pages', { params: { published_only: publishedOnly } });
   return data;
@@ -187,7 +202,6 @@ export const deletePage = async (id) => {
   return data;
 };
 
-// Blog
 export const getBlogPosts = async (publishedOnly = true, limit = 20, skip = 0) => {
   const { data } = await api.get('/blog', { params: { published_only: publishedOnly, limit, skip } });
   return data;
