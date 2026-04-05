@@ -14,6 +14,38 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
 
   const hasCode = deal?.code && deal.code.trim() !== '';
 
+  const handleRedirect = useCallback(async () => {
+  if (!deal || !deal.affiliate_url) return;
+
+  // 1. Copy the code to clipboard first (if it exists)
+  if (deal.code) {
+    try {
+      await navigator.clipboard.writeText(deal.code);
+      toast.success('Code copied to clipboard!');
+    } catch (err) {
+      console.error("Clipboard failed");
+    }
+  }
+
+  // 2. Prepare the URL
+  let finalUrl = deal.affiliate_url.trim();
+  if (!finalUrl.startsWith('http')) {
+    finalUrl = `https://${finalUrl}`;
+  }
+
+  // 3. Track the click (Analytics)
+  trackAffiliateClick(deal.id || deal._id, deal.brand_name, finalUrl);
+  trackClick(deal.id || deal._id, 'web').catch(() => {});
+
+  // 4. Open the store
+  const newWindow = window.open(finalUrl, '_blank', 'noopener,noreferrer');
+  
+  // Mobile Fallback: If window.open is blocked, redirect the current tab
+  if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
+    window.location.href = finalUrl;
+  }
+}, [deal]);
+
   const handleRedirect = useCallback(() => {
     if (!deal || !deal.affiliate_url) return;
     

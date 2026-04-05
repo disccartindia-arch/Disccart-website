@@ -65,7 +65,7 @@ class CouponCreate(BaseModel):
     discount_value: float = 0
     is_active: bool = True
 
-    # Fix: Ensure URLs always start with http/https
+    # Fix: Ensure URLs always start with http/https for mobile redirection
     @validator('affiliate_url')
     def validate_url(cls, v):
         v = v.strip()
@@ -208,7 +208,7 @@ async def bulk_upload(file: UploadFile = File(...)):
         row["created_at"] = datetime.now(timezone.utc)
         
         try:
-            # Handle potential empty price strings
+            # Handle potential empty price strings from CSV
             orig = row.get("original_price")
             disc = row.get("discounted_price")
             row["original_price"] = float(orig) if orig and str(orig).strip() else 0.0
@@ -256,5 +256,5 @@ async def startup():
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run (app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=port)
     
