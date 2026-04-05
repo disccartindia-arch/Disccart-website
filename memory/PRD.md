@@ -1,10 +1,10 @@
 # DISCCART - AI-Powered Coupon & Deals Platform
 
 ## Original Problem Statement
-Build DISCCART – an AI-powered coupon and deals platform with React + FastAPI + MongoDB.
+Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + MongoDB. Core features: deal listing, high-conversion coupon reveal UX, admin panel, smart affiliate engine, AI Deal Score, and fake coupon detection.
 
 ## Tech Stack
-- **Frontend**: React 18 + **Vite 5** (migrated from CRA/CRACO), TailwindCSS, Shadcn UI, Framer Motion
+- **Frontend**: React 18 + Vite 5, TailwindCSS, Shadcn UI, Framer Motion
 - **Backend**: FastAPI (Python), Motor (async MongoDB)
 - **Database**: MongoDB
 - **Auth**: JWT (httpOnly cookies)
@@ -17,26 +17,56 @@ Build DISCCART – an AI-powered coupon and deals platform with React + FastAPI 
 - Phase 4: AI Deal Score (0-100), Verification Badges, Coupons Page
 - Phase 5: Logo & Branding (green+orange palette from logo)
 - Phase 6: Vite Migration & Deployment Prep (March 31, 2026)
+- Phase 7: 5 High-Priority Technical Directives Fixed (April 5, 2026)
+  - API 404s resolved (pretty-links, blog, pages routes restored)
+  - Image upload endpoint working (POST /api/upload-image)
+  - Offer type segregation (coupon/deal) added to model + admin UI
+  - Coupon redirect popup fallback (window.location.href)
+  - Category coupon count mismatch fixed (.count_documents per category)
+  - api.js garbage/merge-conflict code cleaned up
+  - CouponRevealModal duplicate handleRedirect removed
+  - AdminPage.jsx extreme indentation fixed, DialogDescription added (ARIA)
+  - CORS middleware moved before router (correct ordering)
 
-## Build System (Current)
-- **Build tool**: Vite 5.4 (NOT CRA/CRACO)
-- **Entry**: `frontend/index.html` → `src/main.jsx`
-- **Env vars**: `VITE_BACKEND_URL`, `VITE_GA_MEASUREMENT_ID` (VITE_ prefix)
+## Build System
+- **Build tool**: Vite 5.4
+- **Entry**: `frontend/index.html` -> `src/main.jsx`
+- **Env vars**: `VITE_BACKEND_URL`, `VITE_GA_MEASUREMENT_ID`
 - **Output**: `dist/` directory
-- **Config files**: `vite.config.js`, `postcss.config.cjs`, `tailwind.config.cjs`
-- **Scripts**: `npm run dev`, `npm run build`, `npm run preview`
 - **Node**: Compatible with 18+ and 20+
 
 ## Deployment
-- Backend: Render (free) — `uvicorn app:app --host 0.0.0.0 --port $PORT`
-- Frontend: Vercel — Vite preset, output `dist/`
+- Backend: Render (free) - `uvicorn app:app --host 0.0.0.0 --port $PORT`
+- Frontend: Vercel - Vite preset, output `dist/`
 - Database: MongoDB Atlas (free M0)
-- See DEPLOYMENT_GUIDE.md for full instructions
 
 ## Admin Credentials
 - Email: disccartindia@gmail.com
 - Password: Admin@2026@
 
+## Key API Endpoints
+- POST /api/auth/login
+- GET /api/categories (includes coupon_count)
+- GET/POST/PUT/DELETE /api/coupons (includes offer_type)
+- POST /api/upload-image
+- GET/POST/PUT/DELETE /api/pretty-links
+- GET/POST/PUT/DELETE /api/pages
+- GET/POST/PUT/DELETE /api/blog
+- GET /api/analytics/overview
+- POST /api/clicks
+
+## DB Schema
+- `coupons`: {title, brand_name, category_name, code, affiliate_url, offer_type, image_url, original_price, discounted_price, discount_type, discount_value, is_active, created_at}
+- `categories`: {name, slug, icon, description, image_url}
+- `users`: {email, password_hash, role, created_at}
+- `clicks`: {coupon_id, brand, timestamp, ip}
+- `pretty_links`: {slug, destination_url, title, description, is_active, clicks}
+- `pages`: {slug, title, content, meta_description, is_published}
+- `blog_posts`: {slug, title, content, published, created_at}
+
 ## Backlog
-- P1: Facebook Pixel tracking
-- P2: User wishlist, email capture, push notifications
+- P1: Facebook Pixel tracking implementation
+- P2: User wishlist system
+- P2: Email capture popup for deal alerts
+- P2: Push notifications (Firebase)
+- P2: "Best time to buy" hint
