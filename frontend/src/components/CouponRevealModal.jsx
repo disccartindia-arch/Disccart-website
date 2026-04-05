@@ -15,40 +15,19 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
   const hasCode = deal?.code && deal.code.trim() !== '';
 
   const handleRedirect = useCallback(async () => {
-  if (!deal || !deal.affiliate_url) return;
-
-  // 1. Copy the code to clipboard first (if it exists)
-  if (deal.code) {
-    try {
-      await navigator.clipboard.writeText(deal.code);
-      toast.success('Code copied to clipboard!');
-    } catch (err) {
-      console.error("Clipboard failed");
-    }
-  }
-
-  // 2. Prepare the URL
-  let finalUrl = deal.affiliate_url.trim();
-  if (!finalUrl.startsWith('http')) {
-    finalUrl = `https://${finalUrl}`;
-  }
-
-  // 3. Track the click (Analytics)
-  trackAffiliateClick(deal.id || deal._id, deal.brand_name, finalUrl);
-  trackClick(deal.id || deal._id, 'web').catch(() => {});
-
-  // 4. Open the store
-  const newWindow = window.open(finalUrl, '_blank', 'noopener,noreferrer');
-  
-  // Mobile Fallback: If window.open is blocked, redirect the current tab
-  if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-    window.location.href = finalUrl;
-  }
-}, [deal]);
-
-  const handleRedirect = useCallback(() => {
     if (!deal || !deal.affiliate_url) return;
-    
+
+    // Copy code to clipboard first (if it exists)
+    if (deal.code) {
+      try {
+        await navigator.clipboard.writeText(deal.code);
+        toast.success('Code copied to clipboard!');
+      } catch (err) {
+        console.error("Clipboard failed");
+      }
+    }
+
+    // Prepare the URL
     let finalUrl = deal.affiliate_url.trim();
     if (!finalUrl.startsWith('http')) {
       finalUrl = `https://${finalUrl}`;
@@ -57,11 +36,11 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
     // Track analytics
     trackAffiliateClick(deal.id || deal._id, deal.brand_name, finalUrl);
     trackClick(deal.id || deal._id, 'web').catch(() => {});
-    
-    // Attempt to open in new window
+
+    // Open the store - attempt new window first
     const newWindow = window.open(finalUrl, '_blank', 'noopener,noreferrer');
-    
-    // Fallback if blocked (common on mobile)
+
+    // Fallback: If window.open is blocked (common on mobile), redirect current tab
     if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
       window.location.href = finalUrl;
     }
@@ -102,7 +81,7 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
   const copyToClipboard = async () => {
     if (!deal?.code) return;
     trackCouponCopy(deal.id, deal.brand_name, deal.code);
-    
+
     try {
       await navigator.clipboard.writeText(deal.code);
       setCopied(true);
@@ -138,6 +117,7 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
+        data-testid="coupon-reveal-modal"
       >
         <motion.div
           className="absolute inset-0 bg-black/70 backdrop-blur-sm"
@@ -153,6 +133,7 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
           <button
             onClick={handleClose}
             className="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 transition-colors z-10"
+            data-testid="modal-close-btn"
           >
             <X className="w-6 h-6" />
           </button>
@@ -169,9 +150,10 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
           <div className="p-6">
             <div className="border-2 border-dashed border-orange-200 rounded-2xl p-6 mb-6 text-center">
               <p className="text-[10px] text-gray-400 uppercase tracking-[0.2em] font-bold mb-3">Click code to copy</p>
-              <div 
+              <div
                 onClick={copyToClipboard}
                 className="cursor-pointer group relative flex items-center justify-center gap-4 bg-orange-50 py-3 px-4 rounded-xl hover:bg-orange-100 transition-colors"
+                data-testid="copy-code-btn"
               >
                 <code className="font-display font-black text-3xl text-[#ee922c] tracking-wider">
                   {deal.code}
@@ -192,6 +174,7 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
             <button
               onClick={handleRedirect}
               className="w-full bg-[#3c7b48] hover:bg-[#2d6339] text-white font-bold rounded-xl px-6 py-4 flex items-center justify-center gap-2 shadow-lg shadow-green-900/10 active:scale-[0.98] transition-all"
+              data-testid="shop-redirect-btn"
             >
               <ExternalLink className="w-5 h-5" />
               <span>Shop at {deal.brand_name}</span>

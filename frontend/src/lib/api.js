@@ -1,46 +1,7 @@
-// Paste this inside src/lib/api.js
-// If you don't already have axios imported, add this at the very top:
-// import axios from 'axios';
-
-// Ensure you use your dynamic env variable for the URL
-const API_URL = import.meta.env.VITE_API_URL || 'https://disccart-api.onrender.com/api';
-
-const api = axios.create({
-  baseURL: API_URL,
-});
-
-/**
- * =====================
- * NEW: Image Upload API
- * =====================
- * Uploads a file to the backend's image handling endpoint.
- * Assuming your backend has an endpoint: POST /api/upload-image
- */
-export const uploadImage = async (file) => {
-  const formData = new FormData();
-  formData.append('image', file); // The backend expects the key to be 'image'
-
-  try {
-    const response = await api.post('/upload-image', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data', // Crucial for file uploads
-      },
-    });
-    
-    // We assume your backend returns { url: "https://.../your-image.jpg" }
-    return response.data.url; 
-  } catch (error) {
-    console.error('Failed to upload image:', error);
-    throw error;
-  }
-};
-
-// ... keep all other existing functions below this line
 import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_BACKEND_URL;
 
-// Create axios instance with credentials
 const api = axios.create({
   baseURL: `${API_URL}/api`,
   withCredentials: true,
@@ -49,20 +10,16 @@ const api = axios.create({
   }
 });
 
-// Response interceptor for token refresh
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config;
-    
-    // If 401 and not already retrying, try to refresh token
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       try {
         await axios.post(`${API_URL}/api/auth/refresh`, {}, { withCredentials: true });
         return api(originalRequest);
       } catch {
-        // Refresh failed, redirect to login
         window.location.href = '/login';
         return Promise.reject(error);
       }
@@ -71,21 +28,13 @@ api.interceptors.response.use(
   }
 );
 
-// ===================== NEW: IMAGE UPLOAD =====================
-/**
- * Uploads a single image file to the backend
- * @param {File} file - The image file from an input field
- * @returns {Promise<string>} - Returns the URL of the uploaded image
- */
+// ===================== IMAGE UPLOAD =====================
 export const uploadImage = async (file) => {
   const formData = new FormData();
   formData.append('image', file);
-
   const { data } = await api.post('/upload-image', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   });
-  
-  // Assuming your backend returns { url: "..." }
   return data.url;
 };
 
@@ -127,7 +76,7 @@ export const bulkUploadCoupons = async (file) => {
 // ===================== CATEGORIES =====================
 export const getCategories = async () => {
   const { data } = await api.get('/categories');
-  return Array.isArray(data) ? data : []; // Safety check for mobile
+  return Array.isArray(data) ? data : [];
 };
 
 export const getCategory = async (id) => {
