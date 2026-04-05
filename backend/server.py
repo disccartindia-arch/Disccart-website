@@ -221,6 +221,23 @@ async def bulk_upload(file: UploadFile = File(...)):
         count += 1
     return {"message": f"Successfully uploaded {count} deals"}
 
+    # image upload 
+import shutil
+
+@api_router.post("/upload-image")
+async def upload_image(image: UploadFile = File(...)):
+    # Create a 'uploads' folder if it doesn't exist
+    if not os.path.exists("uploads"):
+        os.makedirs("uploads")
+    
+    file_path = f"uploads/{image.filename}"
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(image.file, buffer)
+    
+    # In production (Render), this URL would be your domain + path
+    # For now, it returns the relative path or a placeholder
+    return {"url": f"https://disccart-api.onrender.com/{file_path}"}
+
 # ===================== APP CONFIG =====================
 
 app.include_router(api_router, prefix="/api")
