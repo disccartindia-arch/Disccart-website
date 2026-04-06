@@ -21,7 +21,7 @@ import {
 import {
   getCoupons, createCoupon, updateCoupon, deleteCoupon,
   bulkUploadCoupons, getAnalyticsOverview, getCategories,
-  createCategory, deleteCategory,
+  createCategory, updateCategory, deleteCategory,
   getPrettyLinks, createPrettyLink, updatePrettyLink, deletePrettyLink,
   getPages, createPage, updatePage, deletePage,
   getBlogPosts, createBlogPost, updateBlogPost, deleteBlogPost,
@@ -281,20 +281,36 @@ export default function AdminPage() {
               <motion.div key="categories" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 space-y-6">
                 <div className="flex justify-between items-center">
                   <h2 className="text-2xl font-bold">Categories</h2>
-                  <Button onClick={() => setShowCategoryDialog(true)} className="bg-blue-600 hover:bg-blue-700" data-testid="add-category-btn">
+                  <Button onClick={() => { setEditingItem(null); setShowCategoryDialog(true); }} className="bg-blue-600 hover:bg-blue-700" data-testid="add-category-btn">
                     <Plus className="w-4 h-4 mr-2" /> Add Category
                   </Button>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {categories.map((cat) => (
                     <div key={cat.id} className="border rounded-2xl p-4 flex items-center justify-between" data-testid={`category-card-${cat.id}`}>
-                      <div>
-                        <p className="font-bold text-lg">{cat.name}</p>
-                        <p className="text-sm text-gray-400">{cat.coupon_count || 0} deals</p>
+                      <div className="flex items-center gap-4">
+                        {cat.background_image_url ? (
+                          <div className="w-14 h-14 rounded-xl overflow-hidden border bg-gray-100 flex-shrink-0">
+                            <img src={cat.background_image_url} alt={cat.name} className="w-full h-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className="w-14 h-14 rounded-xl bg-gray-100 border flex items-center justify-center flex-shrink-0">
+                            <ImagePlus className="w-5 h-5 text-gray-300" />
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-bold text-lg">{cat.name}</p>
+                          <p className="text-sm text-gray-400">{cat.coupon_count || 0} deals</p>
+                        </div>
                       </div>
-                      <Button variant="outline" size="sm" className="text-red-500" onClick={() => handleDelete('category', cat.id, cat.name)} data-testid={`delete-category-${cat.id}`}>
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => { setEditingItem(cat); setShowCategoryDialog(true); }} data-testid={`edit-category-${cat.id}`}>
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button variant="outline" size="sm" className="text-red-500" onClick={() => handleDelete('category', cat.id, cat.name)} data-testid={`delete-category-${cat.id}`}>
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -471,12 +487,12 @@ export default function AdminPage() {
 
       {/* Category Dialog */}
       <Dialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>
-        <DialogContent className="rounded-3xl">
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black">Create Category</DialogTitle>
-            <DialogDescription>Add a new category for organizing deals.</DialogDescription>
+            <DialogTitle className="text-2xl font-black">{editingItem ? 'Edit Category' : 'Create Category'}</DialogTitle>
+            <DialogDescription>Add or update a category with an optional background image.</DialogDescription>
           </DialogHeader>
-          <CategoryForm onSuccess={() => { setShowCategoryDialog(false); fetchData(); }} />
+          <CategoryForm item={editingItem} onSuccess={() => { setShowCategoryDialog(false); setEditingItem(null); fetchData(); }} />
         </DialogContent>
       </Dialog>
 
@@ -541,8 +557,7 @@ function CouponForm({ item, categories, onSuccess }) {
       setImageUrl(uploadedUrl);
       toast.success('Image uploaded!');
     } catch {
-      toast.error('Image upload failed.');
-      setFilePreview(null);
+      toast.error('Image upload failed. Preview kept — retry or clear.');
     } finally {
       setUploading(false);
     }
@@ -553,8 +568,8 @@ function CouponForm({ item, categories, onSuccess }) {
     setLoading(true);
     const dealData = {
       ...form,
-      original_price: parseFloat(form.original_price) || 0,
-      discounted_price: parseFloat(form.discounted_price) || 0,
+      original_price: form.original_price !== '' && form.original_price !== null ? parseFloat(form.original_price) : null,
+      discounted_price: form.discounted_price !== '' && form.discounted_price !== null ? parseFloat(form.discounted_price) : null,
       image_url: imageUrl,
     };
     try {
@@ -650,19 +665,40 @@ function CouponForm({ item, categories, onSuccess }) {
 /* ================================================================
    CATEGORY FORM
    ================================================================ */
-function CategoryForm({ onSuccess }) {
-  const [name, setName] = useState('');
+function CategoryForm({ item, onSuccess }) {
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [name, setName] = useState(item?.name || '');
+  const [bgImageUrl, setBgImageUrl] = useState(item?.background_image_url || '');
+  const [bgPreview, setBgPreview] = useState(item?.background_image_url || null);
+
+  const handleBgUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+    setBgPreview(URL.createObjectURL(file));
+    setUploading(true);
+    try {
+      const uploadedUrl = await uploadImage(file);
+      setBgImageUrl(uploadedUrl);
+      toast.success('Background image uploaded!');
+    } catch {
+      toast.error('Image upload failed. Preview kept — retry or clear.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await createCategory({ name });
-      toast.success('Category created');
+      const payload = { name, background_image_url: bgImageUrl || null };
+      if (item) await updateCategory(item.id, payload);
+      else await createCategory(payload);
+      toast.success(item ? 'Category updated' : 'Category created');
       onSuccess();
     } catch {
-      toast.error('Failed to create category');
+      toast.error('Failed to save category');
     } finally {
       setLoading(false);
     }
@@ -675,8 +711,29 @@ function CategoryForm({ onSuccess }) {
         <Input placeholder="E.g., Fashion, Electronics" value={name} onChange={e => setName(e.target.value)} required className="h-14 rounded-2xl" data-testid="category-name-input" />
         <p className="text-xs text-gray-400">Slug will be generated automatically.</p>
       </div>
-      <Button type="submit" className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 font-bold" disabled={loading} data-testid="save-category-btn">
-        {loading ? <Loader2 className="animate-spin" /> : 'Confirm & Add Category'}
+
+      {/* Background Image Upload */}
+      <div className="space-y-2">
+        <Label className="text-xs font-bold uppercase tracking-widest text-gray-400">Background Image</Label>
+        <div className="relative group flex items-center justify-center w-full h-36 border-2 border-dashed border-gray-200 rounded-2xl hover:border-blue-400 hover:bg-blue-50/50 transition-all bg-gray-50 overflow-hidden">
+          {bgPreview ? (
+            <>
+              <img src={bgPreview} alt="Background preview" className="w-full h-full object-cover" />
+              <button type="button" onClick={() => { setBgImageUrl(''); setBgPreview(null); }} className="absolute top-2 right-2 bg-white/80 p-2 rounded-full shadow-lg text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" data-testid="clear-cat-bg-btn"><X size={16} /></button>
+            </>
+          ) : (
+            <label htmlFor="catBgUpload" className="cursor-pointer flex flex-col items-center justify-center p-6 space-y-2">
+              <ImagePlus size={28} className="text-gray-300 group-hover:text-blue-500" />
+              <span className="text-sm text-gray-600">{uploading ? 'Uploading...' : 'Click to upload background'}</span>
+            </label>
+          )}
+          <input id="catBgUpload" type="file" accept="image/*" onChange={handleBgUpload} className="absolute inset-0 opacity-0 cursor-pointer" disabled={uploading} data-testid="cat-bg-input" />
+          {uploading && <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-10 rounded-2xl"><Loader2 className="w-8 h-8 animate-spin text-blue-500" /></div>}
+        </div>
+      </div>
+
+      <Button type="submit" className="w-full h-14 rounded-2xl bg-blue-600 hover:bg-blue-700 font-bold" disabled={loading || uploading} data-testid="save-category-btn">
+        {loading ? <Loader2 className="animate-spin" /> : (item ? 'Update Category' : 'Confirm & Add Category')}
       </Button>
     </form>
   );

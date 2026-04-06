@@ -148,14 +148,16 @@ export default function DealCard({ deal }) {
         )}
 
         {/* Price Display */}
-        {deal.original_price && deal.discounted_price && (
+        {deal.discounted_price != null && deal.discounted_price > 0 && (
           <div className="flex items-center gap-2 mb-3">
             <span className="font-display font-black text-xl text-[#3c7b48]">
               ₹{Number(deal.discounted_price).toLocaleString()}
             </span>
-            <span className="text-sm text-gray-400 line-through">
-              ₹{Number(deal.original_price).toLocaleString()}
-            </span>
+            {deal.original_price != null && deal.original_price > 0 && (
+              <span className="text-sm text-gray-400 line-through">
+                ₹{Number(deal.original_price).toLocaleString()}
+              </span>
+            )}
           </div>
         )}
 

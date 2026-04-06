@@ -1,5 +1,6 @@
 from fastapi import FastAPI, APIRouter, Request, HTTPException, UploadFile, File, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, validator
 from typing import List, Optional
@@ -60,6 +61,7 @@ class CategoryCreate(BaseModel):
     icon: Optional[str] = "Tag"
     description: Optional[str] = None
     image_url: Optional[str] = None
+    background_image_url: Optional[str] = None
 
     @validator('slug', pre=True, always=True)
     def generate_slug(cls, v, values):
@@ -78,8 +80,8 @@ class CouponCreate(BaseModel):
     brand_name: str
     category_name: str
     code: Optional[str] = None
-    original_price: Optional[float] = 0.0
-    discounted_price: Optional[float] = 0.0
+    original_price: Optional[float] = None
+    discounted_price: Optional[float] = None
     affiliate_url: str
     discount_type: str = "percentage"
     discount_value: float = 0
@@ -164,6 +166,7 @@ async def get_categories():
 async def add_cat(data: CategoryCreate):
     doc = data.model_dump()
     result = await db.categories.insert_one(doc)
+    doc.pop("_id", None)
     return {"id": str(result.inserted_id), **doc}
 
 @api_router.put("/categories/{cat_id}")
@@ -280,7 +283,7 @@ async def upload_image(image: UploadFile = File(...)):
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(image.file, buffer)
 
-    return {"url": f"/uploads/{file_path}"}
+    return {"url": f"/{file_path}"}
 
 # ===================== PRETTY LINKS (Placeholder) =====================
 
@@ -384,6 +387,9 @@ async def delete_blog_post(post_id: str):
 # ===================== APP CONFIG =====================
 
 app.include_router(api_router, prefix="/api")
+
+os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 @app.on_event("startup")
 async def startup():
