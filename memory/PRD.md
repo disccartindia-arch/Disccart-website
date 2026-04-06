@@ -19,34 +19,29 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
 - Phase 6: Vite Migration & Deployment Prep (March 31, 2026)
 - Phase 7: 5 High-Priority Technical Directives Fixed (April 5, 2026)
 - Phase 8: Admin & Data Sync Finalization (April 5, 2026)
-  - Search & filter bar for Deals table (by title, brand, code, category)
-  - Pretty Links tab: full CRUD table with Add/Edit/Delete + dialog form
-  - Pages tab: full CRUD table with Add/Edit/Delete + Markdown content editor
-  - Blog tab: full CRUD table with Add/Edit/Delete + Markdown content editor
-  - Affiliate redirect verified (CouponRevealModal popup fallback)
-  - Category coupon counts verified accurate (count_documents per category)
+  - Search & filter bar for Deals table
+  - Pretty Links/Pages/Blog tabs with full CRUD tables
+- Phase 9: UI & Data Bug Fixes (April 6, 2026)
+  - BUG 1 FIXED: Image upload preview now works (blob URL preview, no clearing on failure, fixed double-path URL, added static file serving)
+  - BUG 2 FIXED: Category background image editing (background_image_url field added to model, upload component in CategoryForm, edit button on category cards)
+  - BUG 3 FIXED: Prices default to null instead of 0 (Optional[float]=None in model, null sent for empty fields, DealCard only shows price when not null and > 0)
 
 ## Build System
 - **Build tool**: Vite 5.4
 - **Entry**: `frontend/index.html` -> `src/main.jsx`
 - **Env vars**: `VITE_BACKEND_URL`, `VITE_GA_MEASUREMENT_ID`
 - **Output**: `dist/` directory
-- **Node**: Compatible with 18+ and 20+
 
 ## Deployment
 - Backend: Render (free) - `uvicorn app:app --host 0.0.0.0 --port $PORT`
 - Frontend: Vercel - Vite preset, output `dist/`
 - Database: MongoDB Atlas (free M0)
 
-## Admin Credentials
-- Email: disccartindia@gmail.com
-- Password: Admin@2026@
-
 ## Key API Endpoints
 - POST /api/auth/login
-- GET /api/categories (includes coupon_count)
-- GET/POST/PUT/DELETE /api/coupons (includes offer_type)
-- POST /api/upload-image
+- GET /api/categories (includes coupon_count, background_image_url)
+- GET/POST/PUT/DELETE /api/coupons (offer_type, nullable prices)
+- POST /api/upload-image (returns /uploads/filename, served via StaticFiles)
 - GET/POST/PUT/DELETE /api/pretty-links
 - GET/POST/PUT/DELETE /api/pages
 - GET/POST/PUT/DELETE /api/blog
@@ -54,8 +49,8 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
 - POST /api/clicks
 
 ## DB Schema
-- `coupons`: {title, brand_name, category_name, code, affiliate_url, offer_type, image_url, original_price, discounted_price, discount_type, discount_value, is_active, created_at}
-- `categories`: {name, slug, icon, description, image_url}
+- `coupons`: {title, brand_name, category_name, code, affiliate_url, offer_type, image_url, original_price (nullable), discounted_price (nullable), discount_type, discount_value, is_active, created_at}
+- `categories`: {name, slug, icon, description, image_url, background_image_url}
 - `users`: {email, password_hash, role, created_at}
 - `clicks`: {coupon_id, brand, timestamp, ip}
 - `pretty_links`: {slug, destination_url, title, description, is_active, clicks}
