@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { TrendingUp, Zap, ArrowRight, Tag } from 'lucide-react';
+import { TrendingUp, Zap, ArrowRight, Tag, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getCoupons, getCategories } from '../lib/api';
 import DealCard from '../components/DealCard';
@@ -10,20 +10,25 @@ import { HomeSEO } from '../components/SEO';
 export default function HomePage() {
   const [featuredDeals, setFeaturedDeals] = useState([]);
   const [trendingDeals, setTrendingDeals] = useState([]);
+  const [limitedDeals, setLimitedDeals] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [featured, all, cats] = await Promise.all([
+        const [featured, all, cats, limited] = await Promise.all([
           getCoupons({ featured: true, limit: 4 }),
           getCoupons({ limit: 12 }),
-          getCategories()
+          getCategories(),
+          getCoupons({ offer_type: 'limited', limit: 6 })
         ]);
         setFeaturedDeals(featured);
         setTrendingDeals(all);
         setCategories(cats);
+        // Filter limited deals from the "all" response if the dedicated query doesn't filter server-side
+        const limitedResults = Array.isArray(limited) ? limited.filter(d => d.offer_type === 'limited') : [];
+        setLimitedDeals(limitedResults);
       } catch (error) {
         console.error('Failed to fetch data:', error);
       } finally {
@@ -131,13 +136,37 @@ export default function HomePage() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
                 <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
                   <h3 className="font-display font-bold text-lg">{category.name}</h3>
-                  <p className="text-sm text-white/80">{category.deal_count || 0} deals</p>
+                  <p className="text-sm text-white/80">{category.coupon_count || 0} deals</p>
                 </div>
               </Link>
             ))}
           </div>
         </div>
       </section>
+
+      {/* Limited Time Offers */}
+      {limitedDeals.length > 0 && (
+        <section className="py-8" data-testid="limited-offers-section">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-2">
+                <div className="bg-red-500 text-white p-1.5 rounded-lg animate-pulse">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <h2 className="font-display font-bold text-2xl text-gray-900">Limited Time Offers</h2>
+              </div>
+              <Link to="/deals/limited-time" className="text-red-500 font-medium flex items-center gap-1 hover:gap-2 transition-all">
+                View All <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {limitedDeals.slice(0, 6).map((deal) => (
+                <DealCard key={deal.id} deal={deal} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Trending Deals */}
       <section className="py-8" data-testid="trending-section">

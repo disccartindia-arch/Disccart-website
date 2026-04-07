@@ -257,8 +257,8 @@ export default function AdminPage() {
                         <TableCell className="font-semibold max-w-[300px] truncate">{c.title}</TableCell>
                         <TableCell><span className="px-2 py-1 bg-gray-100 rounded-md text-xs font-bold">{c.brand_name}</span></TableCell>
                         <TableCell>
-                          <span className={`px-2 py-1 rounded-md text-xs font-bold ${c.offer_type === 'deal' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'}`}>
-                            {c.offer_type === 'deal' ? 'Deal' : 'Coupon'}
+                          <span className={`px-2 py-1 rounded-md text-xs font-bold ${c.offer_type === 'deal' ? 'bg-green-100 text-green-700' : c.offer_type === 'limited' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>
+                            {c.offer_type === 'deal' ? 'Deal' : c.offer_type === 'limited' ? 'Limited' : 'Coupon'}
                           </span>
                         </TableCell>
                         <TableCell className="text-green-700 font-bold">{c.discounted_price ? `₹${c.discounted_price}` : '-'}</TableCell>
@@ -642,6 +642,7 @@ function CouponForm({ item, categories, onSuccess }) {
         <select className="w-full h-12 px-3 py-2 border rounded-xl text-sm bg-white" value={form.offer_type || 'coupon'} onChange={e => setForm({...form, offer_type: e.target.value})} data-testid="deal-offer-type-select">
           <option value="coupon">Coupon</option>
           <option value="deal">Deal</option>
+          <option value="limited">Limited Time Offer</option>
         </select>
       </div>
 

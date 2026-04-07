@@ -192,13 +192,23 @@ async def delete_cat(cat_id: str):
 
 @api_router.get("/coupons")
 @api_router.get("/coupons-only")
-async def get_coupons(category: Optional[str] = None, isAdmin: bool = False):
+async def get_coupons(category: Optional[str] = None, offer_type: Optional[str] = None, isAdmin: bool = False):
     query = {}
     if not isAdmin:
         query["is_active"] = True
 
     if category and category not in ["All", "undefined", "null"]:
-        query["category_name"] = category
+        # First try to find category by slug to get the real name
+        cat_doc = await db.categories.find_one({"slug": category})
+        if cat_doc:
+            query["category_name"] = cat_doc["name"]
+        else:
+            # Fallback: try slug-style match (e.g., "food-dining" matches "Food & Dining")
+            slug_pattern = category.replace("-", ".+")
+            query["category_name"] = {"$regex": f"^{slug_pattern}$", "$options": "i"}
+
+    if offer_type and offer_type not in ["undefined", "null"]:
+        query["offer_type"] = offer_type
 
     coupons = await db.coupons.find(query).sort("created_at", -1).to_list(1000)
     for c in coupons:

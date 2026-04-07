@@ -37,13 +37,8 @@ export default function CouponRevealModal({ deal, isOpen, onClose }) {
     trackAffiliateClick(deal.id || deal._id, deal.brand_name, finalUrl);
     trackClick(deal.id || deal._id, 'web').catch(() => {});
 
-    // Open the store - attempt new window first
-    const newWindow = window.open(finalUrl, '_blank', 'noopener,noreferrer');
-
-    // Fallback: If window.open is blocked (common on mobile), redirect current tab
-    if (!newWindow || newWindow.closed || typeof newWindow.closed === 'undefined') {
-      window.location.href = finalUrl;
-    }
+    // Open the store in new tab ONLY
+    window.open(finalUrl, '_blank', 'noopener,noreferrer');
   }, [deal]);
 
   // Handle countdown and auto-redirect
