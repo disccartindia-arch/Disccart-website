@@ -19,37 +19,32 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
 - Phase 6: Vite Migration & Deployment Prep (March 31, 2026)
 - Phase 7: 5 High-Priority Technical Directives Fixed (April 5, 2026)
 - Phase 8: Admin & Data Sync Finalization (April 5, 2026)
-  - Search & filter bar for Deals table
-  - Pretty Links/Pages/Blog tabs with full CRUD tables
 - Phase 9: UI & Data Bug Fixes (April 6, 2026)
-  - BUG 1 FIXED: Image upload preview now works (blob URL preview, no clearing on failure, fixed double-path URL, added static file serving)
-  - BUG 2 FIXED: Category background image editing (background_image_url field added to model, upload component in CategoryForm, edit button on category cards)
-  - BUG 3 FIXED: Prices default to null instead of 0 (Optional[float]=None in model, null sent for empty fields, DealCard only shows price when not null and > 0)
+- Phase 10: Master Fix & Feature Implementation (April 7, 2026)
+  - Image fallback: onError handler on DealCard replaces broken images with gradient placeholder
+  - Redirect fix: CouponRevealModal uses window.open ONLY, no window.location.href redirect
+  - Limited Time Offer system: offer_type=limited, homepage section, admin dropdown, /deals/limited-time page, red badge in admin table
+  - Category auto-sync: CategoryPage uses api.js (no hardcoded URL), backend slug-to-name DB lookup, case-insensitive matching, fixed DB slugs
+  - Fixed category count display on homepage (coupon_count not deal_count)
+  - Fixed category slugs in DB (food-dining, home-living)
 
 ## Build System
 - **Build tool**: Vite 5.4
 - **Entry**: `frontend/index.html` -> `src/main.jsx`
 - **Env vars**: `VITE_BACKEND_URL`, `VITE_GA_MEASUREMENT_ID`
-- **Output**: `dist/` directory
-
-## Deployment
-- Backend: Render (free) - `uvicorn app:app --host 0.0.0.0 --port $PORT`
-- Frontend: Vercel - Vite preset, output `dist/`
-- Database: MongoDB Atlas (free M0)
 
 ## Key API Endpoints
 - POST /api/auth/login
 - GET /api/categories (includes coupon_count, background_image_url)
-- GET/POST/PUT/DELETE /api/coupons (offer_type, nullable prices)
-- POST /api/upload-image (returns /uploads/filename, served via StaticFiles)
-- GET/POST/PUT/DELETE /api/pretty-links
-- GET/POST/PUT/DELETE /api/pages
-- GET/POST/PUT/DELETE /api/blog
+- GET /api/coupons?category=slug&offer_type=limited (slug-to-name lookup, case-insensitive)
+- POST/PUT/DELETE /api/coupons (offer_type: coupon|deal|limited, nullable prices)
+- POST /api/upload-image → /uploads/filename (StaticFiles mount)
+- GET/POST/PUT/DELETE /api/pretty-links, /api/pages, /api/blog
 - GET /api/analytics/overview
 - POST /api/clicks
 
 ## DB Schema
-- `coupons`: {title, brand_name, category_name, code, affiliate_url, offer_type, image_url, original_price (nullable), discounted_price (nullable), discount_type, discount_value, is_active, created_at}
+- `coupons`: {title, brand_name, category_name, code, affiliate_url, offer_type (coupon|deal|limited), image_url, original_price (nullable), discounted_price (nullable), discount_type, discount_value, is_active, created_at}
 - `categories`: {name, slug, icon, description, image_url, background_image_url}
 - `users`: {email, password_hash, role, created_at}
 - `clicks`: {coupon_id, brand, timestamp, ip}
