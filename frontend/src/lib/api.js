@@ -2,6 +2,17 @@ import axios from 'axios';
 
 const API_URL = import.meta.env.VITE_BACKEND_URL;
 
+// Resolve image URLs: /uploads/file.jpg → BACKEND_URL/uploads/file.jpg
+export const resolveImageUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (url.startsWith('/uploads/') || url.startsWith('uploads/')) {
+    const cleanPath = url.startsWith('/') ? url : `/${url}`;
+    return `${API_URL}${cleanPath}`;
+  }
+  return url;
+};
+
 const api = axios.create({
   baseURL: `${API_URL}/api`,
   withCredentials: true,
@@ -211,6 +222,27 @@ export const updateBlogPost = async (id, postData) => {
 
 export const deleteBlogPost = async (id) => {
   const { data } = await api.delete(`/blog/${id}`);
+  return data;
+};
+
+// ===================== WISHLIST =====================
+export const getWishlist = async (userId) => {
+  const { data } = await api.get(`/wishlist/${userId}`);
+  return data;
+};
+
+export const getWishlistIds = async (userId) => {
+  const { data } = await api.get(`/wishlist/${userId}/ids`);
+  return data;
+};
+
+export const addToWishlist = async (userId, couponId) => {
+  const { data } = await api.post('/wishlist', { user_id: userId, coupon_id: couponId });
+  return data;
+};
+
+export const removeFromWishlist = async (userId, couponId) => {
+  const { data } = await api.delete(`/wishlist/${userId}/${couponId}`);
   return data;
 };
 

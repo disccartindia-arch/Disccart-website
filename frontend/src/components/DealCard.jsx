@@ -1,8 +1,10 @@
-import { useState } from 'react';
-import { BadgeCheck, Copy, ExternalLink, Tag, ShieldAlert, ShieldX, TrendingUp } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { BadgeCheck, Copy, ExternalLink, Tag, ShieldAlert, ShieldX, TrendingUp, Heart, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
 import CouponRevealModal from './CouponRevealModal';
 import { ShareButtonsCompact } from './ShareButtons';
+import { resolveImageUrl, addToWishlist, removeFromWishlist } from '../lib/api';
+import { toast } from 'sonner';
 
 function DealScoreBadge({ score }) {
   if (!score && score !== 0) return null;
@@ -57,12 +59,62 @@ function VerificationBadge({ status }) {
   );
 }
 
-export default function DealCard({ deal }) {
+export default function DealCard({ deal, wishlistedIds = [], onWishlistChange }) {
   const [showModal, setShowModal] = useState(false);
+  const [isWishlisted, setIsWishlisted] = useState(false);
+  const [countdown, setCountdown] = useState('');
 
   // --- URL & ID FIXES ---
-  // Ensure the ID is available for tracking
   const dealId = deal.id || deal._id;
+
+  // Wishlist state from parent
+  useEffect(() => {
+    setIsWishlisted(wishlistedIds.includes(dealId));
+  }, [wishlistedIds, dealId]);
+
+  // Expiry countdown ticker
+  useEffect(() => {
+    if (!deal.expires_at) return;
+    const update = () => {
+      const now = new Date();
+      const exp = new Date(deal.expires_at);
+      const diff = exp - now;
+      if (diff <= 0) { setCountdown('Expired'); return; }
+      const d = Math.floor(diff / 86400000);
+      const h = Math.floor((diff % 86400000) / 3600000);
+      const m = Math.floor((diff % 3600000) / 60000);
+      const s = Math.floor((diff % 60000) / 1000);
+      if (d > 0) setCountdown(`${d}d ${h}h left`);
+      else if (h > 0) setCountdown(`${h}h ${m}m left`);
+      else setCountdown(`${m}m ${s}s left`);
+    };
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, [deal.expires_at]);
+
+  const toggleWishlist = async (e) => {
+    e.stopPropagation();
+    const userId = localStorage.getItem('disccart_user_id') || 'guest';
+    if (!localStorage.getItem('disccart_user_id')) {
+      localStorage.setItem('disccart_user_id', 'guest_' + Math.random().toString(36).slice(2));
+    }
+    const uid = localStorage.getItem('disccart_user_id');
+    try {
+      if (isWishlisted) {
+        await removeFromWishlist(uid, dealId);
+        setIsWishlisted(false);
+        toast.success('Removed from wishlist');
+      } else {
+        await addToWishlist(uid, dealId);
+        setIsWishlisted(true);
+        toast.success('Added to wishlist!');
+      }
+      onWishlistChange?.();
+    } catch {
+      toast.error('Failed to update wishlist');
+    }
+  };
   
   // Ensure the affiliate URL is clean for the modal to use
   const sanitizedDeal = {
@@ -105,7 +157,7 @@ export default function DealCard({ deal }) {
         <div className="relative aspect-[4/3] rounded-xl overflow-hidden mb-4 bg-gray-100">
           {deal.image_url ? (
             <img 
-              src={deal.image_url} 
+              src={resolveImageUrl(deal.image_url)} 
               alt={deal.title}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
               loading="lazy"
@@ -124,7 +176,30 @@ export default function DealCard({ deal }) {
           <div className="absolute top-2 right-2 bg-[#3c7b48] text-white font-black text-lg px-3 py-1 rounded-xl font-display shadow-lg">
             {getDiscountDisplay()}
           </div>
+
+          {/* Wishlist Heart */}
+          <button
+            onClick={toggleWishlist}
+            className={`absolute top-2 left-2 p-1.5 rounded-full shadow-md transition-all z-10 ${isWishlisted ? 'bg-red-500 text-white' : 'bg-white/90 text-gray-400 hover:text-red-500'}`}
+            data-testid={`wishlist-btn-${dealId}`}
+          >
+            <Heart className="w-4 h-4" fill={isWishlisted ? 'currentColor' : 'none'} />
+          </button>
         </div>
+
+        {/* Expiry Countdown */}
+        {deal.expires_at && countdown && countdown !== 'Expired' && (
+          <div className="flex items-center gap-1.5 mb-2 px-2 py-1 bg-red-50 text-red-600 rounded-lg w-fit text-xs font-bold" data-testid={`countdown-${dealId}`}>
+            <Clock className="w-3 h-3 animate-pulse" />
+            <span>{countdown}</span>
+          </div>
+        )}
+        {deal.expires_at && countdown === 'Expired' && (
+          <div className="flex items-center gap-1.5 mb-2 px-2 py-1 bg-gray-100 text-gray-500 rounded-lg w-fit text-xs font-bold">
+            <Clock className="w-3 h-3" />
+            <span>Expired</span>
+          </div>
+        )}
 
         {/* Score + Verification Row */}
         <div className="flex items-center justify-between mb-2">

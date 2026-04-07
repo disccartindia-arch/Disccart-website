@@ -27,6 +27,7 @@ import {
   getBlogPosts, createBlogPost, updateBlogPost, deleteBlogPost,
   uploadImage
 } from '../lib/api';
+import { resolveImageUrl } from '../lib/api';
 import { AdminSEO } from '../components/SEO';
 
 export default function AdminPage() {
@@ -251,7 +252,7 @@ export default function AdminPage() {
                       <TableRow key={c.id}>
                         <TableCell>
                           <div className="w-12 h-12 rounded-lg bg-gray-100 overflow-hidden border">
-                            {c.image_url ? <img src={c.image_url} className="w-full h-full object-cover" alt="" /> : <Tag className="w-full h-full p-3 text-gray-300" />}
+                            {c.image_url ? <img src={resolveImageUrl(c.image_url)} className="w-full h-full object-cover" alt="" /> : <Tag className="w-full h-full p-3 text-gray-300" />}
                           </div>
                         </TableCell>
                         <TableCell className="font-semibold max-w-[300px] truncate">{c.title}</TableCell>
@@ -544,7 +545,7 @@ function CouponForm({ item, categories, onSuccess }) {
   const [form, setForm] = useState(item || {
     title: '', brand_name: '', category_name: '',
     original_price: '', discounted_price: '',
-    affiliate_url: '', code: '', is_active: true, offer_type: 'coupon',
+    affiliate_url: '', code: '', is_active: true, offer_type: 'coupon', expires_at: '',
   });
 
   const handleFileChange = async (event) => {
@@ -571,6 +572,7 @@ function CouponForm({ item, categories, onSuccess }) {
       original_price: form.original_price !== '' && form.original_price !== null ? parseFloat(form.original_price) : null,
       discounted_price: form.discounted_price !== '' && form.discounted_price !== null ? parseFloat(form.discounted_price) : null,
       image_url: imageUrl,
+      expires_at: form.expires_at || null,
     };
     try {
       if (item) await updateCoupon(item.id, dealData);
@@ -645,6 +647,15 @@ function CouponForm({ item, categories, onSuccess }) {
           <option value="limited">Limited Time Offer</option>
         </select>
       </div>
+
+      {/* Expiry Date - only for Limited Time Offers */}
+      {form.offer_type === 'limited' && (
+        <div className="space-y-2">
+          <Label>Expiry Date & Time</Label>
+          <Input type="datetime-local" value={form.expires_at || ''} onChange={e => setForm({...form, expires_at: e.target.value})} className="h-12 rounded-xl" data-testid="deal-expires-input" />
+          <p className="text-xs text-gray-400">Set when this limited offer expires. A live countdown will show on the card.</p>
+        </div>
+      )}
 
       <div className="space-y-2">
         <Label>Promo Code (Optional)</Label>

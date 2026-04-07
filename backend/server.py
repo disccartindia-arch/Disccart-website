@@ -89,6 +89,7 @@ class CouponCreate(BaseModel):
     offer_type: Optional[str] = "coupon"
     image_url: Optional[str] = None
     description: Optional[str] = None
+    expires_at: Optional[str] = None
 
     @validator('affiliate_url')
     def validate_url(cls, v):
@@ -294,6 +295,48 @@ async def upload_image(image: UploadFile = File(...)):
         shutil.copyfileobj(image.file, buffer)
 
     return {"url": f"/{file_path}"}
+
+# ===================== WISHLIST =====================
+
+@api_router.get("/wishlist/{user_id}")
+async def get_wishlist(user_id: str):
+    items = await db.wishlists.find({"user_id": user_id}).to_list(500)
+    coupon_ids = [item.get("coupon_id") for item in items]
+    coupons = []
+    for cid in coupon_ids:
+        try:
+            coupon = await db.coupons.find_one({"_id": ObjectId(cid)})
+            if coupon:
+                coupon["id"] = str(coupon.pop("_id"))
+                coupons.append(coupon)
+        except Exception:
+            pass
+    return coupons
+
+@api_router.get("/wishlist/{user_id}/ids")
+async def get_wishlist_ids(user_id: str):
+    items = await db.wishlists.find({"user_id": user_id}).to_list(500)
+    return [item.get("coupon_id") for item in items]
+
+@api_router.post("/wishlist")
+async def add_to_wishlist(request: Request):
+    data = await request.json()
+    user_id = data.get("user_id")
+    coupon_id = data.get("coupon_id")
+    existing = await db.wishlists.find_one({"user_id": user_id, "coupon_id": coupon_id})
+    if existing:
+        return {"status": "already_exists"}
+    await db.wishlists.insert_one({
+        "user_id": user_id,
+        "coupon_id": coupon_id,
+        "created_at": datetime.now(timezone.utc)
+    })
+    return {"status": "added"}
+
+@api_router.delete("/wishlist/{user_id}/{coupon_id}")
+async def remove_from_wishlist(user_id: str, coupon_id: str):
+    await db.wishlists.delete_one({"user_id": user_id, "coupon_id": coupon_id})
+    return {"status": "removed"}
 
 # ===================== PRETTY LINKS (Placeholder) =====================
 
