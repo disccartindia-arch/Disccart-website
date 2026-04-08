@@ -496,59 +496,94 @@ export default function AdminPage() {
 function CouponForm({ item, categories, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+
   const [imageUrl, setImageUrl] = useState(item?.image_url || '');
   const [filePreview, setFilePreview] = useState(item?.image_url || null);
 
-  const [form, setForm] = useState(item || {
-    title: '', brand_name: '', category_name: '',
-    original_price: '', discounted_price: '',
-    affiliate_url: '', code: '', offer_type: 'deal', is_active: true
+  const [form, setForm] = useState({
+    title: item?.title || '',
+    brand_name: item?.brand_name || '',
+    category_name: item?.category_name ? item.category_name.split(",") : [],
+    original_price: item?.original_price || '',
+    discounted_price: item?.discounted_price || '',
+    affiliate_url: item?.affiliate_url || '',
+    code: item?.code || '',
+    offer_type: item?.offer_type || 'deal',
+    is_active: item?.is_active ?? true
   });
 
+  // 📸 IMAGE UPLOAD
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
     setFilePreview(URL.createObjectURL(file));
     setUploading(true);
+
     try {
       const url = await uploadImage(file);
       setImageUrl(url);
-      toast.success("Image Ready");
+      toast.success("Image Uploaded");
     } catch {
       toast.error("Upload Failed");
-    } finally { setUploading(false); }
+    } finally {
+      setUploading(false);
+    }
   };
 
+  // ❌ REMOVE IMAGE
   const handleRemoveImage = () => {
     setImageUrl('');
     setFilePreview(null);
   };
 
+  // 📤 SUBMIT
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+
     try {
-      const payload = { 
-        ...form, 
-        image_url: imageUrl,
+      const payload = {
+        ...form,
+        image_url: imageUrl || null,
+        category_name: form.category_name.join(","), // convert array → string
         original_price: form.original_price === '' ? null : parseFloat(form.original_price),
         discounted_price: form.discounted_price === '' ? null : parseFloat(form.discounted_price)
       };
+
       if (item) await updateCoupon(item.id, payload);
       else await createCoupon(payload);
+
+      toast.success("Saved Successfully");
       onSuccess();
-    } catch { toast.error("Save failed"); } finally { setLoading(false); }
+    } catch {
+      toast.error("Save failed");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+
+      {/* IMAGE */}
       <div className="space-y-2">
         <Label>Deal Image</Label>
+
         <div className="relative group w-full h-40 border-2 border-dashed rounded-2xl flex items-center justify-center bg-gray-50 overflow-hidden">
+
           {filePreview ? (
             <>
-              <img src={resolveImageUrl(filePreview)} className="w-full h-full object-contain p-2" />
-              <button type="button" onClick={handleRemoveImage} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg hover:bg-red-600"><X size={16} /></button>
+              <img src={filePreview} className="w-full h-full object-contain p-2" />
+
+              {/* ❌ REMOVE BUTTON */}
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow hover:bg-red-600"
+              >
+                <X size={16} />
+              </button>
             </>
           ) : (
             <label className="flex flex-col items-center cursor-pointer">
@@ -557,37 +592,110 @@ function CouponForm({ item, categories, onSuccess }) {
               <input type="file" className="hidden" onChange={handleFileChange} accept="image/*" />
             </label>
           )}
-          {uploading && <div className="absolute inset-0 bg-white/60 flex items-center justify-center"><Loader2 className="animate-spin text-orange-500" /></div>}
+
+          {uploading && (
+            <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
+              <Loader2 className="animate-spin text-orange-500" />
+            </div>
+          )}
         </div>
       </div>
 
-      <Input placeholder="Title" value={form.title} onChange={e => setForm({...form, title: e.target.value})} required />
-      
-      <div className="grid grid-cols-2 gap-4">
-        <select className="border rounded-lg p-2 h-12" value={form.offer_type} onChange={e => setForm({...form, offer_type: e.target.value})}>
-           <option value="deal">Deal</option>
-           <option value="coupon">Coupon</option>
-        </select>
-        <select className="border rounded-lg p-2 h-12" value={form.category_name} onChange={e => setForm({...form, category_name: e.target.value})} required>
-           <option value="">Select Category</option>
-           {categories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
-        </select>
+      {/* TITLE */}
+      <Input
+        placeholder="Title"
+        value={form.title}
+        onChange={(e) => setForm({ ...form, title: e.target.value })}
+        required
+      />
+
+      {/* OFFER TYPE */}
+      <select
+        className="border rounded-lg p-2 h-12 w-full"
+        value={form.offer_type}
+        onChange={(e) => setForm({ ...form, offer_type: e.target.value })}
+      >
+        <option value="deal">Deal</option>
+        <option value="coupon">Coupon</option>
+        <option value="limited">Limited Time Offer</option>
+      </select>
+
+      {/* 🔥 MULTI CATEGORY */}
+      <div className="space-y-2">
+        <Label>Select Categories</Label>
+
+        <div className="grid grid-cols-2 gap-2">
+          {categories.map((cat) => (
+            <label key={cat.id} className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                value={cat.name}
+                checked={form.category_name.includes(cat.name)}
+                onChange={(e) => {
+                  const val = e.target.value;
+
+                  setForm((prev) => ({
+                    ...prev,
+                    category_name: prev.category_name.includes(val)
+                      ? prev.category_name.filter((c) => c !== val)
+                      : [...prev.category_name, val],
+                  }));
+                }}
+              />
+              {cat.name}
+            </label>
+          ))}
+        </div>
       </div>
 
+      {/* BRAND + CODE */}
       <div className="grid grid-cols-2 gap-4">
-        <Input placeholder="Brand" value={form.brand_name} onChange={e => setForm({...form, brand_name: e.target.value})} required />
-        <Input placeholder="Promo Code (Optional)" value={form.code} onChange={e => setForm({...form, code: e.target.value})} />
+        <Input
+          placeholder="Brand"
+          value={form.brand_name}
+          onChange={(e) => setForm({ ...form, brand_name: e.target.value })}
+          required
+        />
+
+        <Input
+          placeholder="Promo Code"
+          value={form.code}
+          onChange={(e) => setForm({ ...form, code: e.target.value })}
+        />
       </div>
 
+      {/* PRICES */}
       <div className="grid grid-cols-2 gap-4">
-        <Input type="number" placeholder="Original Price" value={form.original_price} onChange={e => setForm({...form, original_price: e.target.value})} />
-        <Input type="number" placeholder="Offer Price" value={form.discounted_price} onChange={e => setForm({...form, discounted_price: e.target.value})} />
+        <Input
+          type="number"
+          placeholder="Original Price"
+          value={form.original_price}
+          onChange={(e) => setForm({ ...form, original_price: e.target.value })}
+        />
+
+        <Input
+          type="number"
+          placeholder="Discounted Price"
+          value={form.discounted_price}
+          onChange={(e) => setForm({ ...form, discounted_price: e.target.value })}
+        />
       </div>
 
-      <Input placeholder="Affiliate URL" value={form.affiliate_url} onChange={e => setForm({...form, affiliate_url: e.target.value})} required />
+      {/* URL */}
+      <Input
+        placeholder="Affiliate URL"
+        value={form.affiliate_url}
+        onChange={(e) => setForm({ ...form, affiliate_url: e.target.value })}
+        required
+      />
 
-      <Button type="submit" className="w-full h-12 bg-[#ee922c]" disabled={loading || uploading}>
-        {loading ? <Loader2 className="animate-spin" /> : 'Save Deal Changes'}
+      {/* SUBMIT */}
+      <Button
+        type="submit"
+        className="w-full h-12 bg-[#ee922c]"
+        disabled={loading || uploading}
+      >
+        {loading ? <Loader2 className="animate-spin" /> : "Save Deal"}
       </Button>
     </form>
   );
