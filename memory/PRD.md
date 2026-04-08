@@ -51,6 +51,10 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
 - `wishlists`: {user_id, coupon_id, created_at}
 - `clicks`: {coupon_id, brand, timestamp, ip}
 
+## Phase 13: Stability & Build Fixes (Feb 2026)
+- Verified .map() crash fix across all pages — 100% pass rate (iteration 9)
+- Added chunkSizeWarningLimit: 1000 to vite.config.js build config
+
 ## Backlog
 - P1: Facebook Pixel tracking implementation
 - P2: Email capture popup for deal alerts
