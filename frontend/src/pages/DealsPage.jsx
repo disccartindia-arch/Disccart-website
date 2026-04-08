@@ -14,9 +14,10 @@ export default function DealsPage() {
     const fetchDeals = async () => {
       try {
         const data = await getCoupons({ limit: 50 });
-        setDeals(data);
+        setDeals(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error('Failed to fetch deals:', error);
+        setDeals([]);
       } finally {
         setLoading(false);
       }

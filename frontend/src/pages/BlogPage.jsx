@@ -13,9 +13,10 @@ export default function BlogPage() {
     const fetchPosts = async () => {
       try {
         const data = await getBlogPosts(true, 20);
-        setPosts(data);
+        setPosts(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error('Failed to fetch blog posts:', error);
+        setPosts([]);
       } finally {
         setLoading(false);
       }

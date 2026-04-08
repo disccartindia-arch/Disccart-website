@@ -52,7 +52,7 @@ export const uploadImage = async (file) => {
 // ===================== COUPONS =====================
 export const getCoupons = async (params = {}) => {
   const { data } = await api.get('/coupons', { params });
-  return data;
+  return Array.isArray(data) ? data : [];
 };
 
 export const getCoupon = async (id) => {
@@ -156,12 +156,12 @@ export const generateAIContent = async (contentData) => {
 // ===================== ADDITIONAL FEATURES =====================
 export const getCouponsOnly = async (params = {}) => {
   const { data } = await api.get('/coupons-only', { params });
-  return data;
+  return Array.isArray(data) ? data : [];
 };
 
 export const getPrettyLinks = async () => {
   const { data } = await api.get('/pretty-links');
-  return data;
+  return Array.isArray(data) ? data : [];
 };
 
 export const createPrettyLink = async (linkData) => {
@@ -182,7 +182,7 @@ export const deletePrettyLink = async (id) => {
 // ===================== CMS & BLOG =====================
 export const getPages = async (publishedOnly = false) => {
   const { data } = await api.get('/pages', { params: { published_only: publishedOnly } });
-  return data;
+  return Array.isArray(data) ? data : [];
 };
 
 export const getPage = async (slug) => {
@@ -207,7 +207,7 @@ export const deletePage = async (id) => {
 
 export const getBlogPosts = async (publishedOnly = true, limit = 20, skip = 0) => {
   const { data } = await api.get('/blog', { params: { published_only: publishedOnly, limit, skip } });
-  return data;
+  return Array.isArray(data) ? data : [];
 };
 
 export const getBlogPost = async (slug) => {
