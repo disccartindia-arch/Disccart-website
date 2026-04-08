@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import Papa from 'papaparse'; // Required for your 8-column CSV format
 import {
   LayoutDashboard, Tag, Upload, Link2, FileText, BookOpen,
   Plus, Pencil, Trash2, X, Loader2, FileSpreadsheet,
@@ -99,19 +98,26 @@ export default function AdminPage() {
     return <Navigate to="/login" replace />;
   }
 
-  // --- REVISED: Bulk Upload with 8-Column Format ---
+  // --- NATIVE CSV PARSER (Fixes Vercel Rollup Error) ---
   const handleFileUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setUploadStatus({ loading: true, message: 'Reading CSV...' });
+    setUploadStatus({ loading: true, message: 'Processing CSV...' });
 
-    Papa.parse(file, {
-      header: true,
-      skipEmptyLines: true,
-      complete: async (results) => {
-        try {
-          const mappedData = results.data.map(row => ({
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const text = event.target.result;
+        const lines = text.split('\n');
+        const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, ''));
+
+        const mappedData = lines.slice(1).filter(line => line.trim() !== '').map(line => {
+          const values = line.split(',').map(v => v.trim().replace(/^"|"$/g, ''));
+          const row = {};
+          headers.forEach((header, index) => { row[header] = values[index]; });
+
+          return {
             title: row['Title'],
             original_price: row['Original Price'] ? parseFloat(row['Original Price']) : null,
             discounted_price: row['Discounted Price'] ? parseFloat(row['Discounted Price']) : null,
@@ -121,18 +127,19 @@ export default function AdminPage() {
             code: row['promo code (coupon)'] || '',
             affiliate_url: row['affiliate url'],
             is_active: true
-          }));
+          };
+        });
 
-          await bulkUploadCoupons(mappedData);
-          setUploadStatus({ loading: false, success: true, message: 'Upload Successful' });
-          toast.success(`${mappedData.length} items added successfully`);
-          fetchData();
-        } catch (err) {
-          setUploadStatus({ loading: false, success: false, message: 'Upload Failed' });
-          toast.error('CSV format incorrect or missing columns');
-        }
+        await bulkUploadCoupons(mappedData);
+        setUploadStatus({ loading: false, success: true, message: 'Bulk Upload Successful' });
+        toast.success(`${mappedData.length} items added to inventory`);
+        fetchData();
+      } catch (err) {
+        setUploadStatus({ loading: false, success: false, message: 'Upload Failed' });
+        toast.error('CSV format mismatch. Ensure headers match exactly.');
       }
-    });
+    };
+    reader.readAsText(file);
   };
 
   const handleDelete = async (type, id, name) => {
@@ -185,7 +192,6 @@ export default function AdminPage() {
           </Button>
         </header>
 
-        {/* Navigation Tabs */}
         <div className="flex flex-wrap gap-2 mb-8 bg-white p-2 rounded-2xl border shadow-sm">
           {tabs.map((item) => (
             <Button
@@ -200,11 +206,9 @@ export default function AdminPage() {
           ))}
         </div>
 
-        {/* Main Content Area */}
         <div className="bg-white rounded-3xl border shadow-sm min-h-[500px] overflow-hidden">
           <AnimatePresence mode="wait">
 
-            {/* DASHBOARD TAB */}
             {activeTab === 'dashboard' && (
               <motion.div key="dashboard" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="p-8 space-y-8">
                 <h2 className="text-2xl font-bold">Overview</h2>
@@ -224,19 +228,16 @@ export default function AdminPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center h-32">
-                    <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
-                  </div>
+                  <div className="flex items-center justify-center h-32"><Loader2 className="w-6 h-6 animate-spin text-gray-400" /></div>
                 )}
               </motion.div>
             )}
 
-            {/* DEALS TAB */}
             {activeTab === 'coupons' && (
               <motion.div key="coupons" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 space-y-6">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                   <h2 className="text-2xl font-bold">Deal Inventory</h2>
-                  <Button onClick={() => { setEditingItem(null); setShowCouponDialog(true); }} className="bg-[#ee922c] hover:bg-[#d9811f]">
+                  <Button onClick={() => { setEditingItem(null); setShowCouponDialog(true); }} className="bg-[#ee922c]">
                     <Plus className="w-4 h-4 mr-2" /> Add New Deal
                   </Button>
                 </div>
@@ -244,7 +245,7 @@ export default function AdminPage() {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                   <Input
-                    placeholder="Search by title, brand, code, or category..."
+                    placeholder="Search for any deal to edit or delete..."
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
                     className="pl-10 h-12 rounded-xl"
@@ -272,11 +273,7 @@ export default function AdminPage() {
                       <TableRow key={c.id}>
                         <TableCell>
                           <div className="w-12 h-12 rounded-lg bg-gray-100 border overflow-hidden">
-                            {c.image_url ? (
-                              <img src={resolveImageUrl(c.image_url)} className="w-full h-full object-cover" />
-                            ) : (
-                              <Tag className="w-full h-full p-3 text-gray-300" />
-                            )}
+                            {c.image_url ? <img src={resolveImageUrl(c.image_url)} className="w-full h-full object-cover" /> : <Tag className="w-full h-full p-3 text-gray-300" />}
                           </div>
                         </TableCell>
                         <TableCell className="font-semibold max-w-[300px] truncate">{c.title}</TableCell>
@@ -298,7 +295,6 @@ export default function AdminPage() {
               </motion.div>
             )}
 
-            {/* CATEGORIES TAB */}
             {activeTab === 'categories' && (
               <motion.div key="categories" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 space-y-6">
                 <div className="flex justify-between items-center">
@@ -310,18 +306,24 @@ export default function AdminPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {categories.map((cat) => (
                     <div key={cat.id} className="border rounded-2xl p-4 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                         <div className="w-10 h-10 rounded-lg bg-gray-100 overflow-hidden">
-                            {cat.background_image_url && <img src={cat.background_image_url} className="w-full h-full object-cover" />}
-                         </div>
-                         <div>
-                           <p className="font-bold">{cat.name}</p>
-                           <p className="text-xs text-gray-400">{cat.coupon_count || 0} items</p>
-                         </div>
+                      <div className="flex items-center gap-4">
+                        {cat.background_image_url ? (
+                          <div className="w-14 h-14 rounded-xl overflow-hidden border bg-gray-100 flex-shrink-0">
+                            <img src={cat.background_image_url} alt={cat.name} className="w-full h-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className="w-14 h-14 rounded-xl bg-gray-100 border flex items-center justify-center flex-shrink-0">
+                            <ImagePlus className="w-5 h-5 text-gray-300" />
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-bold text-lg">{cat.name}</p>
+                          <p className="text-sm text-gray-400">{cat.coupon_count || 0} deals</p>
+                        </div>
                       </div>
-                      <div className="flex gap-1">
-                        <Button variant="ghost" size="sm" onClick={() => { setEditingItem(cat); setShowCategoryDialog(true); }}><Pencil className="w-4 h-4" /></Button>
-                        <Button variant="ghost" size="sm" className="text-red-500" onClick={() => handleDelete('category', cat.id, cat.name)}><Trash2 className="w-4 h-4" /></Button>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => { setEditingItem(cat); setShowCategoryDialog(true); }}><Pencil className="w-4 h-4" /></Button>
+                        <Button variant="outline" size="sm" className="text-red-500" onClick={() => handleDelete('category', cat.id, cat.name)}><Trash2 className="w-4 h-4" /></Button>
                       </div>
                     </div>
                   ))}
@@ -329,14 +331,13 @@ export default function AdminPage() {
               </motion.div>
             )}
 
-            {/* BULK UPLOAD TAB */}
             {activeTab === 'upload' && (
               <motion.div key="upload" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-20 text-center">
                 <FileSpreadsheet className="w-16 h-16 text-gray-200 mx-auto mb-4" />
                 <h2 className="text-2xl font-bold mb-2">Bulk CSV Import</h2>
-                <p className="text-gray-500 mb-8 max-w-md mx-auto">Upload the 8-column CSV format. Use "Coupon" or "Deal" in the Offer Type column.</p>
+                <p className="text-gray-500 mb-8 max-w-md mx-auto">Upload your 8-column CSV. These items will appear in your Inventory where you can edit or delete them.</p>
                 <input ref={fileInputRef} type="file" accept=".csv" onChange={handleFileUpload} className="hidden" />
-                <Button size="lg" onClick={() => fileInputRef.current.click()} className="bg-[#ee922c] h-14 px-8 rounded-2xl">
+                <Button size="lg" onClick={() => fileInputRef.current?.click()} className="bg-[#ee922c] h-14 px-8 rounded-2xl">
                   {uploadStatus?.loading ? <Loader2 className="animate-spin mr-2" /> : <Upload className="mr-2" />}
                   Select CSV File
                 </Button>
@@ -344,7 +345,6 @@ export default function AdminPage() {
               </motion.div>
             )}
 
-            {/* PRETTY LINKS TAB */}
             {activeTab === 'links' && (
               <motion.div key="links" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 space-y-6">
                 <div className="flex justify-between items-center">
@@ -379,7 +379,6 @@ export default function AdminPage() {
               </motion.div>
             )}
 
-            {/* PAGES TAB */}
             {activeTab === 'pages' && (
               <motion.div key="pages" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 space-y-6">
                 <div className="flex justify-between items-center">
@@ -412,7 +411,6 @@ export default function AdminPage() {
               </motion.div>
             )}
 
-            {/* BLOG TAB */}
             {activeTab === 'blog' && (
               <motion.div key="blog" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 space-y-6">
                 <div className="flex justify-between items-center">
@@ -455,7 +453,6 @@ export default function AdminPage() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black">{editingItem ? 'Edit Deal' : 'Add New Deal'}</DialogTitle>
-            <DialogDescription>Update the details and image for this deal.</DialogDescription>
           </DialogHeader>
           <CouponForm item={editingItem} categories={categories} onSuccess={() => { setShowCouponDialog(false); fetchData(); }} />
         </DialogContent>
@@ -463,10 +460,7 @@ export default function AdminPage() {
 
       <Dialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>
         <DialogContent className="rounded-3xl">
-          <DialogHeader>
-            <DialogTitle>{editingItem ? 'Edit Category' : 'Create Category'}</DialogTitle>
-            <DialogDescription>Add or update a category label and background image.</DialogDescription>
-          </DialogHeader>
+          <DialogHeader><DialogTitle>{editingItem ? 'Edit Category' : 'Create Category'}</DialogTitle></DialogHeader>
           <CategoryForm item={editingItem} onSuccess={() => { setShowCategoryDialog(false); fetchData(); }} />
         </DialogContent>
       </Dialog>
@@ -519,9 +513,9 @@ function CouponForm({ item, categories, onSuccess }) {
     try {
       const url = await uploadImage(file);
       setImageUrl(url);
-      toast.success("Image ready");
+      toast.success("Image Ready");
     } catch {
-      toast.error("Upload failed");
+      toast.error("Upload Failed");
     } finally { setUploading(false); }
   };
 
@@ -537,7 +531,6 @@ function CouponForm({ item, categories, onSuccess }) {
       const payload = { 
         ...form, 
         image_url: imageUrl,
-        // Send null if empty string to avoid "0" visible on site
         original_price: form.original_price === '' ? null : parseFloat(form.original_price),
         discounted_price: form.discounted_price === '' ? null : parseFloat(form.discounted_price)
       };
@@ -555,7 +548,7 @@ function CouponForm({ item, categories, onSuccess }) {
           {filePreview ? (
             <>
               <img src={resolveImageUrl(filePreview)} className="w-full h-full object-contain p-2" />
-              <button type="button" onClick={handleRemoveImage} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg"><X size={16} /></button>
+              <button type="button" onClick={handleRemoveImage} className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg hover:bg-red-600"><X size={16} /></button>
             </>
           ) : (
             <label className="flex flex-col items-center cursor-pointer">
@@ -604,7 +597,6 @@ function CategoryForm({ item, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState(item?.name || '');
   const [bgUrl, setBgUrl] = useState(item?.background_image_url || '');
-
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -613,19 +605,17 @@ function CategoryForm({ item, onSuccess }) {
       if (item) await updateCategory(item.id, payload);
       else await createCategory(payload);
       onSuccess();
-    } catch { toast.error("Failed to save category"); } finally { setLoading(false); }
+    } catch { toast.error("Failed to save"); } finally { setLoading(false); }
   };
-
   return (
     <form onSubmit={handleSubmit} className="space-y-4 pt-4">
       <Input placeholder="Category Name" value={name} onChange={e => setName(e.target.value)} required />
-      <Input placeholder="Background Image URL (Optional)" value={bgUrl} onChange={e => setBgUrl(e.target.value)} />
-      <Button type="submit" className="w-full h-12" disabled={loading}>{loading ? 'Saving...' : 'Confirm'}</Button>
+      <Input placeholder="Image URL (Optional)" value={bgUrl} onChange={e => setBgUrl(e.target.value)} />
+      <Button type="submit" className="w-full h-12" disabled={loading}>Confirm</Button>
     </form>
   );
 }
 
-// Logic for PrettyLink, Page, and Blog forms would follow the standard pattern of handling item/payload...
 function PrettyLinkForm({ item, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState(item || { slug: '', destination_url: '', clicks: 0 });
