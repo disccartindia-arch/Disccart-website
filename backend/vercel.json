@@ -1,8 +1,13 @@
 {
-  "rewrites": [
+  "functions": {
+    "api/app.py": {
+      "runtime": "vercel-python@0.0.6"
+    }
+  },
+  "routes": [
     {
-      "source": "/api/(.*)",
-      "destination": "https://disccart-api.onrender.com/api/$1"
+      "src": "/api/(.*)",
+      "dest": "api/app.py"
     }
   ]
 }

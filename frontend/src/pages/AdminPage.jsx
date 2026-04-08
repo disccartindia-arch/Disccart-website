@@ -29,6 +29,14 @@ import {
 } from '../lib/api';
 import { AdminSEO } from '../components/SEO';
 
+const API = "https://disccart-api.onrender.com";
+
+const getImageUrl = (url) => {
+  if (!url) return null;
+  if (url.startsWith("http")) return url;
+  return API + url;
+};
+
 export default function AdminPage() {
   const { isAuthenticated, isAdmin, loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -273,7 +281,7 @@ export default function AdminPage() {
                       <TableRow key={c.id}>
                         <TableCell>
                           <div className="w-12 h-12 rounded-lg bg-gray-100 border overflow-hidden">
-                            {c.image_url ? <img src={resolveImageUrl(c.image_url)} className="w-full h-full object-cover" /> : <Tag className="w-full h-full p-3 text-gray-300" />}
+                            <img src={getImageUrl(c.image_url)} className="w-full h-full object-cover" /> : <Tag className="w-full h-full p-3 text-gray-300" />}
                           </div>
                         </TableCell>
                         <TableCell className="font-semibold max-w-[300px] truncate">{c.title}</TableCell>
@@ -309,7 +317,7 @@ export default function AdminPage() {
                       <div className="flex items-center gap-4">
                         {cat.background_image_url ? (
                           <div className="w-14 h-14 rounded-xl overflow-hidden border bg-gray-100 flex-shrink-0">
-                            <img src={cat.background_image_url} alt={cat.name} className="w-full h-full object-cover" />
+                            <img src={getImageUrl(cat.background_image_url)} alt={cat.name} className="w-full h-full object-cover" />
                           </div>
                         ) : (
                           <div className="w-14 h-14 rounded-xl bg-gray-100 border flex items-center justify-center flex-shrink-0">

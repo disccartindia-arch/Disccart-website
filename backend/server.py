@@ -28,6 +28,14 @@ client = AsyncIOMotorClient(MONGO_URL)
 db = client[os.getenv("DB_NAME", "disccart")]
 
 app = FastAPI(title="Disccart API")
+UPLOAD_DIR = "uploads"
+
+# Create folder if not exists
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR)
+
+# Serve images
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 # ===================== CORS (must be before routes) =====================
 origins = [
@@ -492,3 +500,20 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
+@app.post("/api/upload")
+async def upload_image(file: UploadFile = File(...)):
+    try:
+        filename = f"{datetime.utcnow().timestamp()}_{file.filename}"
+        filepath = os.path.join("uploads", filename)
+
+        with open(filepath, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        return {
+            "url": f"/uploads/{filename}"
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
