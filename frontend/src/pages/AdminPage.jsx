@@ -76,12 +76,12 @@ export default function AdminPage() {
         getPages().catch(() => []),
         getBlogPosts(false).catch(() => [])
       ]);
-      setCoupons(couponsData || []);
+      setCoupons(Array.isArray(couponsData) ? couponsData : []);
       setAnalytics(analyticsData);
-      setCategories(categoriesData || []);
-      setPrettyLinks(linksData || []);
-      setPages(pagesData || []);
-      setBlogPosts(blogData || []);
+      setCategories(Array.isArray(categoriesData) ? categoriesData : []);
+      setPrettyLinks(Array.isArray(linksData) ? linksData : []);
+      setPages(Array.isArray(pagesData) ? pagesData : []);
+      setBlogPosts(Array.isArray(blogData) ? blogData : []);
     } catch (error) {
       console.error(error);
       toast.error('Failed to load data');

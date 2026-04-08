@@ -23,14 +23,18 @@ export default function HomePage() {
           getCategories(),
           getCoupons({ offer_type: 'limited', limit: 6 })
         ]);
-        setFeaturedDeals(featured);
-        setTrendingDeals(all);
-        setCategories(cats);
+        setFeaturedDeals(Array.isArray(featured) ? featured : []);
+        setTrendingDeals(Array.isArray(all) ? all : []);
+        setCategories(Array.isArray(cats) ? cats : []);
         // Filter limited deals from the "all" response if the dedicated query doesn't filter server-side
-        const limitedResults = Array.isArray(limited) ? limited.filter(d => d.offer_type === 'limited') : [];
+        const limitedResults = Array.isArray(limited) ? limited.filter(d => (d.offer_type || '').includes('limited')) : [];
         setLimitedDeals(limitedResults);
       } catch (error) {
         console.error('Failed to fetch data:', error);
+        setFeaturedDeals([]);
+        setTrendingDeals([]);
+        setCategories([]);
+        setLimitedDeals([]);
       } finally {
         setLoading(false);
       }

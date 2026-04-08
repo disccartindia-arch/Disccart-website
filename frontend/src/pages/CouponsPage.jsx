@@ -180,16 +180,17 @@ export default function CouponsPage() {
       if (selectedCategory) params.category = selectedCategory;
       if (searchQuery.trim()) params.search = searchQuery.trim();
       const data = await getCouponsOnly(params);
-      setCoupons(data);
+      setCoupons(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to fetch coupons:', error);
+      setCoupons([]);
     } finally {
       setLoading(false);
     }
   }, [sortBy, selectedCategory, searchQuery]);
 
   useEffect(() => {
-    getCategories().then(setCategories).catch(() => {});
+    getCategories().then(d => setCategories(Array.isArray(d) ? d : [])).catch(() => {});
   }, []);
 
   useEffect(() => {
