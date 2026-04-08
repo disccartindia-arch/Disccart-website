@@ -98,6 +98,36 @@ class CouponCreate(BaseModel):
             return f'https://{v}'
         return v
 
+        from typing import Optional
+
+class CouponUpdate(BaseModel):
+    title: str
+    brand_name: str
+    category_name: str
+    original_price: Optional[float] = None
+    discounted_price: Optional[float] = None
+    affiliate_url: str
+    image_url: Optional[str] = ""  # Allow empty string for removal
+    code: Optional[str] = None
+    is_active: bool = True
+
+@api_router.put("/coupons/{coupon_id}")
+async def update_coupon(coupon_id: str, coupon: CouponUpdate):
+    # Convert model to dict
+    update_data = coupon.dict()
+    
+    # Update MongoDB
+    result = db.coupons.update_one(
+        {"_id": ObjectId(coupon_id)},
+        {"$set": update_data}
+    )
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Coupon not found")
+        
+    return {"message": "Updated successfully"}
+    
+
 # ===================== AUTH UTILS =====================
 
 def hash_password(password: str) -> str:

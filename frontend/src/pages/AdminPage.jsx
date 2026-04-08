@@ -537,139 +537,48 @@ export default function AdminPage() {
    COUPON FORM
    ================================================================ */
 function CouponForm({ item, categories, onSuccess }) {
-  const [loading, setLoading] = useState(false);
-  const [uploading, setUploading] = useState(false);
+  // ... existing states ...
   const [imageUrl, setImageUrl] = useState(item?.image_url || '');
   const [filePreview, setFilePreview] = useState(item?.image_url || null);
 
-  const [form, setForm] = useState(item || {
-    title: '', brand_name: '', category_name: '',
-    original_price: '', discounted_price: '',
-    affiliate_url: '', code: '', is_active: true, offer_type: 'coupon', expires_at: '',
-  });
-
-  const handleFileChange = async (event) => {
-    const file = event.target.files[0];
-    if (!file) return;
-    setFilePreview(URL.createObjectURL(file));
-    setUploading(true);
-    try {
-      const uploadedUrl = await uploadImage(file);
-      setImageUrl(uploadedUrl);
-      toast.success('Image uploaded!');
-    } catch {
-      toast.error('Image upload failed. Preview kept — retry or clear.');
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    const dealData = {
-      ...form,
-      original_price: form.original_price !== '' && form.original_price !== null ? parseFloat(form.original_price) : null,
-      discounted_price: form.discounted_price !== '' && form.discounted_price !== null ? parseFloat(form.discounted_price) : null,
-      image_url: imageUrl,
-      expires_at: form.expires_at || null,
-    };
-    try {
-      if (item) await updateCoupon(item.id, dealData);
-      else await createCoupon(dealData);
-      toast.success('Deal saved');
-      onSuccess();
-    } catch (error) {
-      toast.error('Failed to save deal');
-      console.error(error);
-    } finally {
-      setLoading(false);
-    }
+  // --- NEW: Function to remove the image ---
+  const handleRemoveImage = () => {
+    setImageUrl(''); // Clear the URL that goes to the DB
+    setFilePreview(null); // Clear the visual preview
+    toast.info("Image marked for removal. Save to confirm.");
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5 pt-4" data-testid="coupon-form">
-      {/* Image Upload */}
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label className="text-xs font-bold uppercase tracking-widest text-gray-400">Deal Image</Label>
-        <div className="relative group flex items-center justify-center w-full h-40 border-2 border-dashed border-gray-200 rounded-3xl hover:border-orange-400 hover:bg-orange-50/50 transition-all bg-gray-50 overflow-hidden">
+        <Label>Deal Image</Label>
+        <div className="relative group w-full h-40 border-2 border-dashed rounded-2xl flex items-center justify-center bg-gray-50 overflow-hidden">
+          
           {filePreview ? (
             <>
-              <img src={filePreview} alt="Preview" className="w-full h-full object-contain p-2" />
-              <button type="button" onClick={() => { setImageUrl(''); setFilePreview(null); }} className="absolute top-2 right-2 bg-white/80 p-2 rounded-full shadow-lg text-red-500 opacity-0 group-hover:opacity-100 transition-opacity" data-testid="clear-image-btn"><X size={16} /></button>
+              <img src={filePreview} className="w-full h-full object-contain p-2" />
+              
+              {/* --- NEW: Remove Button --- */}
+              <button
+                type="button"
+                onClick={handleRemoveImage}
+                className="absolute top-2 right-2 bg-red-500 text-white p-1.5 rounded-full shadow-lg hover:bg-red-600 transition-colors z-10"
+                title="Remove Image"
+              >
+                <X size={16} />
+              </button>
             </>
           ) : (
-            <label htmlFor="dealImageUpload" className="cursor-pointer flex flex-col items-center justify-center p-6 space-y-2">
-              <ImagePlus size={32} className="text-gray-300 group-hover:text-orange-500" />
-              <span className="text-sm text-gray-600">{uploading ? 'Uploading...' : 'Click to upload deal image'}</span>
+            <label className="flex flex-col items-center cursor-pointer">
+              <ImagePlus className="text-gray-400 mb-2" size={32} />
+              <span className="text-sm text-gray-500">Click to upload</span>
+              <input type="file" className="hidden" onChange={handleFileChange} accept="image/*" />
             </label>
           )}
-          <input id="dealImageUpload" type="file" accept="image/*" onChange={handleFileChange} className="absolute inset-0 opacity-0 cursor-pointer" disabled={uploading} data-testid="deal-image-input" />
-          {uploading && <div className="absolute inset-0 bg-white/80 flex items-center justify-center z-10 rounded-3xl"><Loader2 className="w-8 h-8 animate-spin text-orange-500" /></div>}
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label>Title</Label>
-        <Input placeholder="E.g. Flat 50% Off" value={form.title} onChange={e => setForm({...form, title: e.target.value})} required className="h-12 rounded-xl" data-testid="deal-title-input" />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Original Price</Label>
-          <Input type="number" placeholder="0" value={form.original_price} onChange={e => setForm({...form, original_price: e.target.value})} className="h-12 rounded-xl" data-testid="deal-original-price" />
-        </div>
-        <div className="space-y-2">
-          <Label>Discounted Price</Label>
-          <Input type="number" placeholder="0" value={form.discounted_price} onChange={e => setForm({...form, discounted_price: e.target.value})} className="h-12 rounded-xl" data-testid="deal-discounted-price" />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label>Brand</Label>
-          <Input placeholder="Amazon, Myntra..." value={form.brand_name} onChange={e => setForm({...form, brand_name: e.target.value})} required className="h-12 rounded-xl" data-testid="deal-brand-input" />
-        </div>
-        <div className="space-y-2">
-          <Label>Category</Label>
-          <select className="w-full h-12 px-3 py-2 border rounded-xl text-sm bg-white" value={form.category_name} onChange={e => setForm({...form, category_name: e.target.value})} required data-testid="deal-category-select">
-            <option value="">Select Category</option>
-            {categories.map(cat => <option key={cat.id} value={cat.name}>{cat.name}</option>)}
-          </select>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label>Offer Type</Label>
-        <select className="w-full h-12 px-3 py-2 border rounded-xl text-sm bg-white" value={form.offer_type || 'coupon'} onChange={e => setForm({...form, offer_type: e.target.value})} data-testid="deal-offer-type-select">
-          <option value="coupon">Coupon</option>
-          <option value="deal">Deal</option>
-          <option value="limited">Limited Time Offer</option>
-        </select>
-      </div>
-
-      {/* Expiry Date - only for Limited Time Offers */}
-      {form.offer_type === 'limited' && (
-        <div className="space-y-2">
-          <Label>Expiry Date & Time</Label>
-          <Input type="datetime-local" value={form.expires_at || ''} onChange={e => setForm({...form, expires_at: e.target.value})} className="h-12 rounded-xl" data-testid="deal-expires-input" />
-          <p className="text-xs text-gray-400">Set when this limited offer expires. A live countdown will show on the card.</p>
-        </div>
-      )}
-
-      <div className="space-y-2">
-        <Label>Promo Code (Optional)</Label>
-        <Input placeholder="E.g. SAVE50" value={form.code} onChange={e => setForm({...form, code: e.target.value})} className="h-12 rounded-xl font-mono uppercase" data-testid="deal-code-input" />
-      </div>
-
-      <div className="space-y-2">
-        <Label>Affiliate URL</Label>
-        <Input placeholder="https://..." value={form.affiliate_url} onChange={e => setForm({...form, affiliate_url: e.target.value})} required className="h-12 rounded-xl" data-testid="deal-url-input" />
-      </div>
-
-      <Button type="submit" className="w-full h-14 rounded-2xl bg-[#ee922c] hover:bg-[#d9811f] text-lg font-bold" disabled={loading || uploading} data-testid="save-deal-btn">
-        {loading || uploading ? <><Loader2 className="animate-spin mr-2" /> Saving...</> : 'Save Deal Changes'}
-      </Button>
+      {/* ... rest of your form fields (Title, Price, etc.) ... */}
     </form>
   );
 }
