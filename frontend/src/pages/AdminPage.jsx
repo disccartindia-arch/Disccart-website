@@ -19,7 +19,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
 } from '../components/ui/dialog';
 import {
-  getCoupons, createCoupon, updateCoupon, deleteCoupon,
+  getCoupons, createCoupon, updateCoupon, deleteCoupon, bulkDeleteCoupons,
   bulkUploadCoupons, getAnalyticsOverview, getCategories,
   createCategory, updateCategory, deleteCategory,
   getPrettyLinks, createPrettyLink, updatePrettyLink, deletePrettyLink,
@@ -28,14 +28,6 @@ import {
   uploadImage, resolveImageUrl
 } from '../lib/api';
 import { AdminSEO } from '../components/SEO';
-
-const API = "https://disccart-api.onrender.com";
-
-const getImageUrl = (url) => {
-  if (!url) return null;
-  if (url.startsWith("http")) return url;
-  return API + url;
-};
 
 export default function AdminPage() {
   const { isAuthenticated, isAdmin, loading: authLoading } = useAuth();
@@ -52,6 +44,10 @@ export default function AdminPage() {
 
   // Search
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Bulk selection
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   // Dialog States
   const [showCouponDialog, setShowCouponDialog] = useState(false);
@@ -165,6 +161,34 @@ export default function AdminPage() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+    if (!window.confirm(`Delete ${selectedIds.length} selected deals? This cannot be undone.`)) return;
+    setBulkDeleting(true);
+    try {
+      await bulkDeleteCoupons(selectedIds);
+      toast.success(`${selectedIds.length} deals deleted`);
+      setSelectedIds([]);
+      fetchData();
+    } catch {
+      toast.error('Bulk delete failed');
+    } finally {
+      setBulkDeleting(false);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filteredCoupons.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(filteredCoupons.map(c => c.id));
+    }
+  };
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
   const filteredCoupons = coupons.filter(c => {
     if (!searchTerm.trim()) return true;
     const q = searchTerm.toLowerCase();
@@ -265,9 +289,24 @@ export default function AdminPage() {
                   )}
                 </div>
 
-                <Table>
+                {/* Bulk actions bar */}
+                {selectedIds.length > 0 && (
+                  <div className="flex items-center gap-3 bg-red-50 border border-red-200 rounded-xl px-4 py-3" data-testid="bulk-actions-bar">
+                    <span className="text-sm font-semibold text-red-700">{selectedIds.length} selected</span>
+                    <Button variant="outline" size="sm" className="text-red-600 border-red-300 hover:bg-red-100" onClick={handleBulkDelete} disabled={bulkDeleting} data-testid="bulk-delete-btn">
+                      {bulkDeleting ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Trash2 className="w-4 h-4 mr-1" />}
+                      Delete Selected
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedIds([])} data-testid="bulk-clear-btn">Clear</Button>
+                  </div>
+                )}
+
+                <Table data-testid="deals-table">
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-10">
+                        <input type="checkbox" checked={filteredCoupons.length > 0 && selectedIds.length === filteredCoupons.length} onChange={toggleSelectAll} className="rounded" data-testid="select-all-checkbox" />
+                      </TableHead>
                       <TableHead>Preview</TableHead>
                       <TableHead>Title</TableHead>
                       <TableHead>Brand</TableHead>
@@ -278,26 +317,40 @@ export default function AdminPage() {
                   </TableHeader>
                   <TableBody>
                     {filteredCoupons.map((c) => (
-                      <TableRow key={c.id}>
+                      <TableRow key={c.id} className={selectedIds.includes(c.id) ? 'bg-orange-50' : ''}>
+                        <TableCell>
+                          <input type="checkbox" checked={selectedIds.includes(c.id)} onChange={() => toggleSelect(c.id)} className="rounded" data-testid={`select-deal-${c.id}`} />
+                        </TableCell>
                         <TableCell>
                           <div className="w-12 h-12 rounded-lg bg-gray-100 border overflow-hidden">
-                            <img src={getImageUrl(c.image_url)} className="w-full h-full object-cover" /> : <Tag className="w-full h-full p-3 text-gray-300" />}
+                            {c.image_url ? (
+                              <img src={resolveImageUrl(c.image_url)} className="w-full h-full object-cover" alt="" onError={(e) => { e.target.style.display='none'; }} />
+                            ) : (
+                              <Tag className="w-full h-full p-3 text-gray-300" />
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="font-semibold max-w-[300px] truncate">{c.title}</TableCell>
                         <TableCell><span className="px-2 py-1 bg-gray-100 rounded-md text-xs font-bold">{c.brand_name}</span></TableCell>
                         <TableCell>
-                          <span className={`px-2 py-1 rounded-md text-xs font-bold uppercase ${c.offer_type === 'coupon' ? 'bg-orange-100 text-orange-700' : 'bg-green-100 text-green-700'}`}>
-                            {c.offer_type || 'deal'}
-                          </span>
+                          <div className="flex flex-wrap gap-1">
+                            {(c.offer_type || 'deal').split(',').map(t => t.trim()).filter(Boolean).map(t => (
+                              <span key={t} className={`px-2 py-0.5 rounded-md text-xs font-bold ${t === 'deal' ? 'bg-green-100 text-green-700' : t === 'limited' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>
+                                {t === 'deal' ? 'Deal' : t === 'limited' ? 'Limited' : 'Coupon'}
+                              </span>
+                            ))}
+                          </div>
                         </TableCell>
                         <TableCell className="text-green-700 font-bold">{c.discounted_price ? `₹${c.discounted_price}` : '-'}</TableCell>
                         <TableCell className="text-right space-x-2">
-                          <Button variant="outline" size="sm" onClick={() => { setEditingItem(c); setShowCouponDialog(true); }}><Pencil className="w-4 h-4" /></Button>
-                          <Button variant="outline" size="sm" className="text-red-500" onClick={() => handleDelete('coupon', c.id, c.title)}><Trash2 className="w-4 h-4" /></Button>
+                          <Button variant="outline" size="sm" onClick={() => { setEditingItem(c); setShowCouponDialog(true); }} data-testid={`edit-deal-${c.id}`}><Pencil className="w-4 h-4" /></Button>
+                          <Button variant="outline" size="sm" className="text-red-500" onClick={() => handleDelete('coupon', c.id, c.title)} data-testid={`delete-deal-${c.id}`}><Trash2 className="w-4 h-4" /></Button>
                         </TableCell>
                       </TableRow>
                     ))}
+                    {filteredCoupons.length === 0 && (
+                      <TableRow><TableCell colSpan={7} className="text-center py-12 text-gray-400">{searchTerm ? 'No deals match your search.' : 'No deals found.'}</TableCell></TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </motion.div>
@@ -317,7 +370,7 @@ export default function AdminPage() {
                       <div className="flex items-center gap-4">
                         {cat.background_image_url ? (
                           <div className="w-14 h-14 rounded-xl overflow-hidden border bg-gray-100 flex-shrink-0">
-                            <img src={getImageUrl(cat.background_image_url)} alt={cat.name} className="w-full h-full object-cover" />
+                            <img src={resolveImageUrl(cat.background_image_url)} alt={cat.name} className="w-full h-full object-cover" />
                           </div>
                         ) : (
                           <div className="w-14 h-14 rounded-xl bg-gray-100 border flex items-center justify-center flex-shrink-0">
@@ -617,16 +670,41 @@ function CouponForm({ item, categories, onSuccess }) {
         required
       />
 
-      {/* OFFER TYPE */}
-      <select
-        className="border rounded-lg p-2 h-12 w-full"
-        value={form.offer_type}
-        onChange={(e) => setForm({ ...form, offer_type: e.target.value })}
-      >
-        <option value="deal">Deal</option>
-        <option value="coupon">Coupon</option>
-        <option value="limited">Limited Time Offer</option>
-      </select>
+      {/* OFFER TYPE - MULTI SELECT */}
+      <div className="space-y-2">
+        <Label>Offer Type</Label>
+        <div className="flex flex-wrap gap-3">
+          {[
+            { value: 'deal', label: 'Deal', color: 'bg-green-100 text-green-700 border-green-300' },
+            { value: 'coupon', label: 'Coupon', color: 'bg-orange-100 text-orange-700 border-orange-300' },
+            { value: 'limited', label: 'Limited Time', color: 'bg-red-100 text-red-700 border-red-300' },
+          ].map(opt => {
+            const offerTypes = (form.offer_type || '').split(',').filter(Boolean);
+            const isChecked = offerTypes.includes(opt.value);
+            return (
+              <label
+                key={opt.value}
+                className={`flex items-center gap-2 px-3 py-2 rounded-xl border cursor-pointer transition-all ${isChecked ? opt.color + ' border-current' : 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100'}`}
+                data-testid={`offer-type-${opt.value}`}
+              >
+                <input
+                  type="checkbox"
+                  className="rounded"
+                  checked={isChecked}
+                  onChange={() => {
+                    const current = offerTypes;
+                    const updated = isChecked
+                      ? current.filter(v => v !== opt.value)
+                      : [...current, opt.value];
+                    setForm({ ...form, offer_type: updated.join(',') || 'deal' });
+                  }}
+                />
+                <span className="text-sm font-semibold">{opt.label}</span>
+              </label>
+            );
+          })}
+        </div>
+      </div>
 
       {/* 🔥 MULTI CATEGORY */}
       <div className="space-y-2">

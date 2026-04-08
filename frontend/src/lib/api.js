@@ -75,6 +75,11 @@ export const deleteCoupon = async (id) => {
   return data;
 };
 
+export const bulkDeleteCoupons = async (ids) => {
+  const { data } = await api.post('/coupons/bulk-delete', { ids });
+  return data;
+};
+
 export const bulkUploadCoupons = async (file) => {
   const formData = new FormData();
   formData.append('file', file);

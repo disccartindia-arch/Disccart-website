@@ -106,8 +106,6 @@ class CouponCreate(BaseModel):
             return f'https://{v}'
         return v
 
-        from typing import Optional
-
 class CouponUpdate(BaseModel):
     title: str
     brand_name: str
@@ -115,24 +113,24 @@ class CouponUpdate(BaseModel):
     original_price: Optional[float] = None
     discounted_price: Optional[float] = None
     affiliate_url: str
-    image_url: Optional[str] = ""  # Allow empty string for removal
+    image_url: Optional[str] = ""
     code: Optional[str] = None
     is_active: bool = True
+    offer_type: Optional[str] = "coupon"
+    description: Optional[str] = None
+    expires_at: Optional[str] = None
+    discount_type: str = "percentage"
+    discount_value: float = 0
 
 @api_router.put("/coupons/{coupon_id}")
 async def update_coupon(coupon_id: str, coupon: CouponUpdate):
-    # Convert model to dict
     update_data = coupon.dict()
-    
-    # Update MongoDB
-    result = db.coupons.update_one(
+    result = await db.coupons.update_one(
         {"_id": ObjectId(coupon_id)},
         {"$set": update_data}
     )
-    
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Coupon not found")
-        
     return {"message": "Updated successfully"}
     
 
@@ -190,7 +188,9 @@ async def get_categories():
     result = []
     for c in cats:
         cat_name = c.get("name", "")
-        coupon_count = await db.coupons.count_documents({"category_name": cat_name})
+        coupon_count = await db.coupons.count_documents({
+            "category_name": {"$regex": cat_name, "$options": "i"}
+        })
         cat_doc = {
             "id": str(c.pop("_id")),
             "coupon_count": coupon_count,
@@ -239,15 +239,12 @@ async def get_coupons(category: Optional[str] = None, offer_type: Optional[str] 
     if category and category not in ["All", "undefined", "null"]:
         # First try to find category by slug to get the real name
         cat_doc = await db.categories.find_one({"slug": category})
-        if cat_doc:
-            query["category_name"] = cat_doc["name"]
-        else:
-            # Fallback: try slug-style match (e.g., "food-dining" matches "Food & Dining")
-            slug_pattern = category.replace("-", ".+")
-            query["category_name"] = {"$regex": f"^{slug_pattern}$", "$options": "i"}
+        cat_name = cat_doc["name"] if cat_doc else category
+        # Use regex to match within comma-separated category_name field
+        query["category_name"] = {"$regex": cat_name, "$options": "i"}
 
     if offer_type and offer_type not in ["undefined", "null"]:
-        query["offer_type"] = offer_type
+        query["offer_type"] = {"$regex": offer_type, "$options": "i"}
 
     coupons = await db.coupons.find(query).sort("created_at", -1).to_list(1000)
     for c in coupons:
@@ -261,18 +258,25 @@ async def create_coupon(data: CouponCreate):
     result = await db.coupons.insert_one(doc)
     return {"id": str(result.inserted_id), "status": "success"}
 
-@api_router.put("/coupons/{coupon_id}")
-async def update_coupon(coupon_id: str, data: CouponCreate):
-    await db.coupons.update_one(
-        {"_id": ObjectId(coupon_id)},
-        {"$set": data.model_dump()}
-    )
-    return {"status": "updated"}
-
 @api_router.delete("/coupons/{coupon_id}")
 async def delete_coupon(coupon_id: str):
     await db.coupons.delete_one({"_id": ObjectId(coupon_id)})
     return {"status": "deleted"}
+
+@api_router.post("/coupons/bulk-delete")
+async def bulk_delete_coupons(request: Request):
+    data = await request.json()
+    ids = data.get("ids", [])
+    if not ids:
+        raise HTTPException(status_code=400, detail="No IDs provided")
+    deleted = 0
+    for cid in ids:
+        try:
+            result = await db.coupons.delete_one({"_id": ObjectId(cid)})
+            deleted += result.deleted_count
+        except Exception:
+            pass
+    return {"deleted": deleted, "status": "success"}
 
 # ===================== CLICK TRACKING =====================
 
@@ -328,11 +332,14 @@ async def upload_image(image: UploadFile = File(...)):
     if not os.path.exists("uploads"):
         os.makedirs("uploads")
 
-    file_path = f"uploads/{image.filename}"
+    # Add timestamp prefix to prevent filename collisions
+    timestamp = int(datetime.now(timezone.utc).timestamp())
+    safe_name = f"{timestamp}_{image.filename}"
+    file_path = f"uploads/{safe_name}"
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(image.file, buffer)
 
-    return {"url": f"/{file_path}"}
+    return {"url": f"/uploads/{safe_name}"}
 
 # ===================== WISHLIST =====================
 
@@ -500,20 +507,4 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8000))
     uvicorn.run(app, host="0.0.0.0", port=port)
-
-@app.post("/api/upload")
-async def upload_image(file: UploadFile = File(...)):
-    try:
-        filename = f"{datetime.utcnow().timestamp()}_{file.filename}"
-        filepath = os.path.join("uploads", filename)
-
-        with open(filepath, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        return {
-            "url": f"/uploads/{filename}"
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
