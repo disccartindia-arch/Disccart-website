@@ -567,6 +567,7 @@ export default function AdminPage() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black">{editingItem ? 'Edit Deal' : 'Add New Deal'}</DialogTitle>
+            <DialogDescription>Fill in the details below. Supported image formats: JPG, PNG, WebP (max 2MB).</DialogDescription>
           </DialogHeader>
           <CouponForm item={editingItem} categories={categories} onSuccess={() => { setShowCouponDialog(false); fetchData(); }} />
         </DialogContent>
@@ -574,35 +575,50 @@ export default function AdminPage() {
 
       <Dialog open={showCategoryDialog} onOpenChange={setShowCategoryDialog}>
         <DialogContent className="rounded-3xl">
-          <DialogHeader><DialogTitle>{editingItem ? 'Edit Category' : 'Create Category'}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{editingItem ? 'Edit Category' : 'Create Category'}</DialogTitle>
+            <DialogDescription>Manage category name and background image.</DialogDescription>
+          </DialogHeader>
           <CategoryForm item={editingItem} onSuccess={() => { setShowCategoryDialog(false); fetchData(); }} />
         </DialogContent>
       </Dialog>
 
       <Dialog open={showLinkDialog} onOpenChange={setShowLinkDialog}>
         <DialogContent className="rounded-3xl">
-          <DialogHeader><DialogTitle>Pretty Link Manager</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Pretty Link Manager</DialogTitle>
+            <DialogDescription>Create or edit a short redirect link.</DialogDescription>
+          </DialogHeader>
           <PrettyLinkForm item={editingItem} onSuccess={() => { setShowLinkDialog(false); fetchData(); }} />
         </DialogContent>
       </Dialog>
 
       <Dialog open={showPageDialog} onOpenChange={setShowPageDialog}>
         <DialogContent className="max-w-2xl rounded-3xl">
-          <DialogHeader><DialogTitle>Page Editor</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Page Editor</DialogTitle>
+            <DialogDescription>Create or edit a static page.</DialogDescription>
+          </DialogHeader>
           <PageForm item={editingItem} onSuccess={() => { setShowPageDialog(false); fetchData(); }} />
         </DialogContent>
       </Dialog>
 
       <Dialog open={showBlogDialog} onOpenChange={setShowBlogDialog}>
         <DialogContent className="max-w-2xl rounded-3xl">
-          <DialogHeader><DialogTitle>Blog Post Editor</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>Blog Post Editor</DialogTitle>
+            <DialogDescription>Write or update a blog post.</DialogDescription>
+          </DialogHeader>
           <BlogForm item={editingItem} onSuccess={() => { setShowBlogDialog(false); fetchData(); }} />
         </DialogContent>
       </Dialog>
 
       <Dialog open={showStoreDialog} onOpenChange={setShowStoreDialog}>
         <DialogContent className="rounded-3xl">
-          <DialogHeader><DialogTitle>{editingItem ? 'Edit Store' : 'Add Store'}</DialogTitle></DialogHeader>
+          <DialogHeader>
+            <DialogTitle>{editingItem ? 'Edit Store' : 'Add Store'}</DialogTitle>
+            <DialogDescription>Manage store name, logo, and filter visibility.</DialogDescription>
+          </DialogHeader>
           <StoreForm item={editingItem} onSuccess={() => { setShowStoreDialog(false); fetchData(); }} />
         </DialogContent>
       </Dialog>
@@ -633,10 +649,23 @@ function CouponForm({ item, categories, onSuccess }) {
     is_active: item?.is_active ?? true
   });
 
-  // 📸 IMAGE UPLOAD
+  // IMAGE UPLOAD
   const handleFileChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    // Validate type
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowed.includes(file.type)) {
+      toast.error('Invalid file type. Use JPG, PNG, or WebP.');
+      return;
+    }
+
+    // Validate size (2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      toast.error('File too large. Maximum size is 2MB.');
+      return;
+    }
 
     setFilePreview(URL.createObjectURL(file));
     setUploading(true);
@@ -645,8 +674,10 @@ function CouponForm({ item, categories, onSuccess }) {
       const url = await uploadImage(file);
       setImageUrl(url);
       toast.success("Image Uploaded");
-    } catch {
-      toast.error("Upload Failed");
+    } catch (err) {
+      console.error('Upload error:', err);
+      toast.error(err?.response?.data?.detail || "Upload Failed. Check Cloudinary config.");
+      setFilePreview(item?.image_url || null);
     } finally {
       setUploading(false);
     }

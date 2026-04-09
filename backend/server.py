@@ -343,12 +343,21 @@ async def bulk_upload(file: UploadFile = File(...)):
 
 @api_router.post("/upload-image")
 async def upload_image(image: UploadFile = File(...)):
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/png", "image/webp", "image/jpg", "image/gif"]
+    if image.content_type and image.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail=f"Invalid file type: {image.content_type}. Allowed: JPG, PNG, WebP, GIF")
+
+    # Validate file size (2MB max)
+    contents = await image.read()
+    if len(contents) > 2 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Maximum size is 2MB.")
+
     try:
         result = cloudinary.uploader.upload(
-            image.file,
+            contents,
             folder="disccart",
             resource_type="image",
-            format="webp",
             transformation=[
                 {"quality": "auto", "fetch_format": "auto"}
             ]
@@ -356,7 +365,7 @@ async def upload_image(image: UploadFile = File(...)):
         return {"url": result["secure_url"]}
     except Exception as e:
         logger.error(f"Cloudinary upload error: {e}")
-        raise HTTPException(status_code=500, detail="Image upload failed")
+        raise HTTPException(status_code=500, detail=str(e))
 
 # ===================== WISHLIST =====================
 
