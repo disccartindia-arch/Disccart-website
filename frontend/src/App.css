@@ -45,3 +45,32 @@ html {
     padding-bottom: max(16px, env(safe-area-inset-bottom));
   }
 }
+
+
+/* Hero section floating animations */
+@keyframes hero-float-slow {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-12px) rotate(3deg); }
+}
+
+@keyframes hero-float-medium {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(-8px) rotate(-2deg); }
+}
+
+@keyframes hero-float-reverse {
+  0%, 100% { transform: translateY(0px) rotate(0deg); }
+  50% { transform: translateY(10px) rotate(2deg); }
+}
+
+.hero-float-slow {
+  animation: hero-float-slow 8s ease-in-out infinite;
+}
+
+.hero-float-medium {
+  animation: hero-float-medium 6s ease-in-out infinite;
+}
+
+.hero-float-reverse {
+  animation: hero-float-reverse 7s ease-in-out infinite;
+}
