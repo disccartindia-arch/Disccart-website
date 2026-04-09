@@ -38,7 +38,9 @@ if not os.path.exists(UPLOAD_DIR):
 app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 # ===================== CORS (must be before routes) =====================
-origins = [
+cors_env = os.environ.get("CORS_ORIGINS", "")
+origins = [o.strip() for o in cors_env.split(",") if o.strip()] if cors_env else []
+origins += [
     "https://disccart.in",
     "https://www.disccart.in",
     "https://disccart-frontend.vercel.app",
@@ -46,6 +48,7 @@ origins = [
     "http://localhost:5173",
     "http://localhost:3000",
 ]
+origins = list(set(origins))
 
 app.add_middleware(
     CORSMiddleware,
