@@ -323,4 +323,15 @@ export const deleteSlide = async (id) => {
   return data;
 };
 
+// ===================== HERO CONFIG =====================
+export const getHeroConfig = async () => {
+  const { data } = await api.get('/hero-config');
+  return data;
+};
+
+export const updateHeroConfig = async (configData) => {
+  const { data } = await api.patch('/admin/hero-config', configData);
+  return data;
+};
+
 export default api;

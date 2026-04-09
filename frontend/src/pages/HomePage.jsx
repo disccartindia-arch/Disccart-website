@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { TrendingUp, Zap, ArrowRight, Tag, Clock } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { getCoupons, getCategories } from '../lib/api';
+import { getCoupons, getCategories, getHeroConfig } from '../lib/api';
 import DealCard from '../components/DealCard';
 import CategoryPills from '../components/CategoryPills';
 import FilterDrawer from '../components/FilterDrawer';
@@ -15,22 +15,24 @@ export default function HomePage() {
   const [limitedDeals, setLimitedDeals] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [hero, setHero] = useState(null);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [featured, all, cats, limited] = await Promise.all([
+        const [featured, all, cats, limited, heroData] = await Promise.all([
           getCoupons({ featured: true, limit: 4 }),
           getCoupons({ limit: 12 }),
           getCategories(),
-          getCoupons({ offer_type: 'limited', limit: 6 })
+          getCoupons({ offer_type: 'limited', limit: 6 }),
+          getHeroConfig().catch(() => null)
         ]);
         setFeaturedDeals(Array.isArray(featured) ? featured : []);
         setTrendingDeals(Array.isArray(all) ? all : []);
         setCategories(Array.isArray(cats) ? cats : []);
-        // Filter limited deals from the "all" response if the dedicated query doesn't filter server-side
         const limitedResults = Array.isArray(limited) ? limited.filter(d => (d.offer_type || '').includes('limited')) : [];
         setLimitedDeals(limitedResults);
+        if (heroData) setHero(heroData);
       } catch (error) {
         console.error('Failed to fetch data:', error);
         setFeaturedDeals([]);
@@ -57,28 +59,27 @@ export default function HomePage() {
     <div className="pb-20 md:pb-8" data-testid="home-page">
       <HomeSEO />
       {/* Hero Section */}
-      <section className="relative overflow-hidden py-8 md:py-12" style={{ background: 'linear-gradient(135deg, #FFF8F0 0%, #F0F9F0 40%, #E8F5E9 65%, #FFF3E0 100%)' }}>
+      <section className="relative overflow-hidden py-8 md:py-12" style={{ background: hero?.bg_gradient || 'linear-gradient(135deg, #FFF8F0 0%, #F0F9F0 40%, #E8F5E9 65%, #FFF3E0 100%)' }}>
         {/* Floating decorative elements */}
+        {(hero?.show_floating_icons !== false) && (
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          {/* Soft blurred circles */}
           <div className="absolute -top-10 -left-10 w-60 h-60 rounded-full bg-green-200/20 blur-3xl hero-float-slow" />
           <div className="absolute top-20 right-10 w-40 h-40 rounded-full bg-orange-200/15 blur-2xl hero-float-medium" />
           <div className="absolute bottom-0 left-1/3 w-52 h-52 rounded-full bg-green-100/20 blur-3xl hero-float-reverse" />
           <div className="absolute -bottom-8 right-1/4 w-36 h-36 rounded-full bg-amber-100/15 blur-2xl hero-float-slow" />
-          
-          {/* Low-opacity floating icons */}
           <svg className="absolute top-[15%] left-[8%] w-8 h-8 text-green-400/[0.08] hero-float-medium" fill="currentColor" viewBox="0 0 24 24"><path d="M21.41 11.58l-9-9A2 2 0 0011 2H4a2 2 0 00-2 2v7c0 .55.22 1.05.59 1.42l9 9a2 2 0 002.82 0l7-7a2 2 0 000-2.84zM7 9a2 2 0 110-4 2 2 0 010 4z"/></svg>
           <svg className="absolute top-[25%] right-[12%] w-10 h-10 text-orange-400/[0.07] hero-float-slow" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><text x="12" y="16" textAnchor="middle" fill="white" fontSize="10" fontWeight="bold">%</text></svg>
           <svg className="absolute bottom-[20%] left-[15%] w-7 h-7 text-green-500/[0.06] hero-float-reverse" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-6h2v2h-2zm0-8h2v6h-2z"/></svg>
           <svg className="absolute top-[60%] right-[20%] w-6 h-6 text-amber-400/[0.06] hero-float-medium" fill="currentColor" viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0020.01 4H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></svg>
           <svg className="absolute top-[40%] left-[75%] w-9 h-9 text-green-300/[0.05] hero-float-slow" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99z"/></svg>
           <svg className="absolute bottom-[35%] left-[45%] w-6 h-6 text-orange-300/[0.06] hero-float-reverse" fill="currentColor" viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
-          
-          {/* Wavy line accent */}
+          {(hero?.show_wave !== false) && (
           <svg className="absolute bottom-0 left-0 w-full h-16 text-green-100/30" viewBox="0 0 1440 60" fill="currentColor" preserveAspectRatio="none">
             <path d="M0,30 C360,60 720,0 1080,30 C1260,45 1380,15 1440,30 L1440,60 L0,60 Z" />
           </svg>
+          )}
         </div>
+        )}
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
@@ -87,20 +88,20 @@ export default function HomePage() {
             transition={{ duration: 0.5 }}
             className="text-center max-w-3xl mx-auto"
           >
-            <h1 className="font-display font-black text-4xl sm:text-5xl lg:text-6xl tracking-tighter text-gray-900 mb-4">
-              Best Deals, <span className="gradient-text">Smart Savings</span>
+            <h1 className="font-display font-black text-4xl sm:text-5xl lg:text-6xl tracking-tighter mb-4" style={{ color: hero?.heading_color || '#111827' }}>
+              {hero?.heading_line1 || 'Best Deals,'} <span className="gradient-text" style={hero?.accent_color ? { backgroundImage: `linear-gradient(135deg, ${hero.accent_color}, #3c7b48)`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' } : {}}>{hero?.heading_line2 || 'Smart Savings'}</span>
             </h1>
-            <p className="text-lg text-gray-600 mb-8">
-              Discover verified coupons and exclusive deals from top brands. Save big on every purchase!
+            <p className="text-lg mb-8" style={{ color: hero?.subtext_color || '#4B5563' }}>
+              {hero?.subtext || 'Discover verified coupons and exclusive deals from top brands. Save big on every purchase!'}
             </p>
             <div className="flex flex-wrap justify-center gap-4">
-              <Link to="/trending" className="bg-[#ee922c] hover:bg-[#d9811f] text-white font-bold rounded-xl px-6 py-3 flex items-center gap-2 transition-all shadow-lg shadow-orange-500/25" data-testid="explore-deals-btn">
+              <Link to={hero?.btn1_link || '/trending'} className="hover:opacity-90 text-white font-bold rounded-xl px-6 py-3 flex items-center gap-2 transition-all shadow-lg" style={{ backgroundColor: hero?.accent_color || '#ee922c', boxShadow: `0 10px 15px -3px ${hero?.accent_color || '#ee922c'}40` }} data-testid="explore-deals-btn">
                 <Zap className="w-5 h-5" />
-                Explore Deals
+                {hero?.btn1_text || 'Explore Deals'}
               </Link>
-              <Link to="/categories" className="border-2 border-gray-200 hover:border-[#ee922c] text-gray-900 font-bold rounded-xl px-6 py-3 flex items-center gap-2 transition-colors" data-testid="view-categories-btn">
+              <Link to={hero?.btn2_link || '/categories'} className="border-2 border-gray-200 hover:border-[#ee922c] font-bold rounded-xl px-6 py-3 flex items-center gap-2 transition-colors" style={{ color: hero?.heading_color || '#111827' }} data-testid="view-categories-btn">
                 <Tag className="w-5 h-5" />
-                View Categories
+                {hero?.btn2_text || 'View Categories'}
               </Link>
             </div>
           </motion.div>

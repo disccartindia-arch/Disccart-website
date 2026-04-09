@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Tag, Upload, Link2, FileText, BookOpen,
   Plus, Pencil, Trash2, X, Loader2, FileSpreadsheet,
   ExternalLink, ImagePlus, Search, Globe, Eye, EyeOff,
-  Store, SlidersHorizontal, Image
+  Store, SlidersHorizontal, Image, Palette
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -29,7 +29,8 @@ import {
   uploadImage, resolveImageUrl,
   getStores, createStore, updateStore, deleteStore,
   getFilterConfig, updateFilterConfig,
-  getAdminSlides, createSlide, updateSlide, deleteSlide
+  getAdminSlides, createSlide, updateSlide, deleteSlide,
+  getHeroConfig, updateHeroConfig
 } from '../lib/api';
 import { AdminSEO } from '../components/SEO';
 
@@ -220,6 +221,7 @@ export default function AdminPage() {
     { id: 'categories', label: 'Categories', icon: Plus },
     { id: 'stores', label: 'Stores', icon: Store },
     { id: 'slider', label: 'Homepage Slider', icon: Image },
+    { id: 'hero', label: 'Hero Editor', icon: Palette },
     { id: 'filters', label: 'Filter Settings', icon: SlidersHorizontal },
     { id: 'upload', label: 'Bulk Import', icon: Upload },
     { id: 'links', label: 'Pretty Links', icon: Link2 },
@@ -485,6 +487,10 @@ export default function AdminPage() {
                   {slides.length === 0 && <p className="text-gray-400 col-span-2 text-center py-12">No slides added yet.</p>}
                 </div>
               </motion.div>
+            )}
+
+            {activeTab === 'hero' && (
+              <HeroEditorTab />
             )}
 
             {activeTab === 'filters' && (
@@ -1254,5 +1260,181 @@ function SlideForm({ item, onSuccess }) {
         {loading ? <Loader2 className="animate-spin" /> : 'Save Slide'}
       </Button>
     </form>
+  );
+}
+
+
+function HeroEditorTab() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    heading_line1: 'Best Deals,',
+    heading_line2: 'Smart Savings',
+    subtext: 'Discover verified coupons and exclusive deals from top brands. Save big on every purchase!',
+    btn1_text: 'Explore Deals',
+    btn1_link: '/trending',
+    btn2_text: 'View Categories',
+    btn2_link: '/categories',
+    bg_color1: '#FFF8F0',
+    bg_color2: '#F0F9F0',
+    bg_color3: '#E8F5E9',
+    bg_color4: '#FFF3E0',
+    heading_color: '#111827',
+    accent_color: '#ee922c',
+    subtext_color: '#4B5563',
+    show_floating_icons: true,
+    show_wave: true,
+  });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await getHeroConfig();
+        setForm(prev => ({ ...prev, ...data }));
+      } catch { /* defaults stay */ }
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  const update = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await updateHeroConfig(form);
+      toast.success('Hero section updated! Refresh homepage to see changes.');
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Failed to save');
+    } finally { setSaving(false); }
+  };
+
+  const previewGradient = `linear-gradient(135deg, ${form.bg_color1} 0%, ${form.bg_color2} 40%, ${form.bg_color3} 65%, ${form.bg_color4} 100%)`;
+
+  if (loading) return <div className="flex items-center justify-center p-20"><Loader2 className="w-8 h-8 animate-spin text-gray-400" /></div>;
+
+  return (
+    <motion.div key="hero" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 space-y-8" data-testid="hero-editor-tab">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Hero Section Editor</h2>
+        <Button onClick={handleSave} disabled={saving} className="bg-[#ee922c]" data-testid="hero-save-btn">
+          {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+          Save Changes
+        </Button>
+      </div>
+
+      {/* Live Preview */}
+      <div className="rounded-2xl overflow-hidden border shadow-sm" data-testid="hero-preview">
+        <div className="relative py-8 px-6 text-center" style={{ background: previewGradient }}>
+          <h3 className="font-black text-2xl mb-2" style={{ color: form.heading_color }}>
+            {form.heading_line1} <span style={{ color: form.accent_color }}>{form.heading_line2}</span>
+          </h3>
+          <p className="text-sm mb-4" style={{ color: form.subtext_color }}>{form.subtext}</p>
+          <div className="flex justify-center gap-2">
+            <span className="text-white text-xs font-bold px-3 py-1.5 rounded-lg" style={{ backgroundColor: form.accent_color }}>{form.btn1_text}</span>
+            <span className="border text-xs font-bold px-3 py-1.5 rounded-lg" style={{ color: form.heading_color }}>{form.btn2_text}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Text Content */}
+        <div className="space-y-5">
+          <h3 className="text-lg font-bold border-b pb-2">Text Content</h3>
+          <div>
+            <Label className="text-sm font-bold mb-1 block">Heading Line 1</Label>
+            <Input value={form.heading_line1} onChange={e => update('heading_line1', e.target.value)} data-testid="hero-heading1" />
+          </div>
+          <div>
+            <Label className="text-sm font-bold mb-1 block">Heading Line 2 (accent)</Label>
+            <Input value={form.heading_line2} onChange={e => update('heading_line2', e.target.value)} data-testid="hero-heading2" />
+          </div>
+          <div>
+            <Label className="text-sm font-bold mb-1 block">Subtext</Label>
+            <textarea
+              value={form.subtext}
+              onChange={e => update('subtext', e.target.value)}
+              className="w-full border rounded-xl p-3 text-sm min-h-[80px] resize-y focus:outline-none focus:ring-2 focus:ring-[#ee922c]/50"
+              data-testid="hero-subtext"
+            />
+          </div>
+
+          <h3 className="text-lg font-bold border-b pb-2 pt-4">Buttons</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-sm font-bold mb-1 block">Button 1 Text</Label>
+              <Input value={form.btn1_text} onChange={e => update('btn1_text', e.target.value)} data-testid="hero-btn1-text" />
+            </div>
+            <div>
+              <Label className="text-sm font-bold mb-1 block">Button 1 Link</Label>
+              <Input value={form.btn1_link} onChange={e => update('btn1_link', e.target.value)} data-testid="hero-btn1-link" />
+            </div>
+            <div>
+              <Label className="text-sm font-bold mb-1 block">Button 2 Text</Label>
+              <Input value={form.btn2_text} onChange={e => update('btn2_text', e.target.value)} data-testid="hero-btn2-text" />
+            </div>
+            <div>
+              <Label className="text-sm font-bold mb-1 block">Button 2 Link</Label>
+              <Input value={form.btn2_link} onChange={e => update('btn2_link', e.target.value)} data-testid="hero-btn2-link" />
+            </div>
+          </div>
+        </div>
+
+        {/* Colors & Style */}
+        <div className="space-y-5">
+          <h3 className="text-lg font-bold border-b pb-2">Background Gradient</h3>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { key: 'bg_color1', label: 'Start (Top-Left)' },
+              { key: 'bg_color2', label: 'Mid 1' },
+              { key: 'bg_color3', label: 'Mid 2' },
+              { key: 'bg_color4', label: 'End (Bottom-Right)' },
+            ].map(c => (
+              <div key={c.key}>
+                <Label className="text-sm font-bold mb-1 block">{c.label}</Label>
+                <div className="flex gap-2 items-center">
+                  <input type="color" value={form[c.key]} onChange={e => update(c.key, e.target.value)} className="w-10 h-10 rounded-lg border cursor-pointer" data-testid={`hero-${c.key}`} />
+                  <Input value={form[c.key]} onChange={e => update(c.key, e.target.value)} className="flex-1 font-mono text-sm" />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <h3 className="text-lg font-bold border-b pb-2 pt-4">Text Colors</h3>
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { key: 'heading_color', label: 'Heading' },
+              { key: 'accent_color', label: 'Accent / Btn' },
+              { key: 'subtext_color', label: 'Subtext' },
+            ].map(c => (
+              <div key={c.key}>
+                <Label className="text-sm font-bold mb-1 block">{c.label}</Label>
+                <div className="flex gap-2 items-center">
+                  <input type="color" value={form[c.key]} onChange={e => update(c.key, e.target.value)} className="w-10 h-10 rounded-lg border cursor-pointer" data-testid={`hero-${c.key}`} />
+                  <Input value={form[c.key]} onChange={e => update(c.key, e.target.value)} className="flex-1 font-mono text-sm" />
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <h3 className="text-lg font-bold border-b pb-2 pt-4">Effects</h3>
+          <div className="space-y-3">
+            <label className="flex items-center gap-3 p-3 rounded-xl border cursor-pointer" data-testid="hero-toggle-icons">
+              <input type="checkbox" checked={form.show_floating_icons} onChange={e => update('show_floating_icons', e.target.checked)} className="rounded" />
+              <div>
+                <span className="font-bold text-sm">Floating Icons</span>
+                <p className="text-xs text-gray-500">Low-opacity decorative icons behind the text</p>
+              </div>
+            </label>
+            <label className="flex items-center gap-3 p-3 rounded-xl border cursor-pointer" data-testid="hero-toggle-wave">
+              <input type="checkbox" checked={form.show_wave} onChange={e => update('show_wave', e.target.checked)} className="rounded" />
+              <div>
+                <span className="font-bold text-sm">Bottom Wave</span>
+                <p className="text-xs text-gray-500">Subtle wavy line at the bottom of the hero</p>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+    </motion.div>
   );
 }

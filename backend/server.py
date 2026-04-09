@@ -770,6 +770,58 @@ async def delete_slide(slide_id: str, request: Request):
     await db.homepage_slides.delete_one({"_id": ObjectId(slide_id)})
     return {"status": "deleted"}
 
+# ===================== HERO CONFIG =====================
+
+HERO_DEFAULTS = {
+    "_id": "hero",
+    "heading_line1": "Best Deals,",
+    "heading_line2": "Smart Savings",
+    "subtext": "Discover verified coupons and exclusive deals from top brands. Save big on every purchase!",
+    "btn1_text": "Explore Deals",
+    "btn1_link": "/trending",
+    "btn2_text": "View Categories",
+    "btn2_link": "/categories",
+    "bg_gradient": "linear-gradient(135deg, #FFF8F0 0%, #F0F9F0 40%, #E8F5E9 65%, #FFF3E0 100%)",
+    "bg_color1": "#FFF8F0",
+    "bg_color2": "#F0F9F0",
+    "bg_color3": "#E8F5E9",
+    "bg_color4": "#FFF3E0",
+    "heading_color": "#111827",
+    "accent_color": "#ee922c",
+    "subtext_color": "#4B5563",
+    "show_floating_icons": True,
+    "show_wave": True,
+}
+
+@api_router.get("/hero-config")
+async def get_hero_config():
+    config = await db.site_settings.find_one({"_id": "hero"})
+    if not config:
+        return HERO_DEFAULTS
+    config.pop("_id", None)
+    merged = {**HERO_DEFAULTS, **config}
+    merged.pop("_id", None)
+    return merged
+
+@api_router.patch("/admin/hero-config")
+async def update_hero_config(request: Request):
+    await admin_required(request)
+    data = await request.json()
+    data.pop("_id", None)
+    # Rebuild gradient from colors if provided
+    c1 = data.get("bg_color1")
+    c2 = data.get("bg_color2")
+    c3 = data.get("bg_color3")
+    c4 = data.get("bg_color4")
+    if c1 and c2 and c3 and c4:
+        data["bg_gradient"] = f"linear-gradient(135deg, {c1} 0%, {c2} 40%, {c3} 65%, {c4} 100%)"
+    await db.site_settings.update_one(
+        {"_id": "hero"},
+        {"$set": data},
+        upsert=True
+    )
+    return {"status": "updated"}
+
 # ===================== APP CONFIG =====================
 
 app.include_router(api_router, prefix="/api")
