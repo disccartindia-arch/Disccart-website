@@ -12,8 +12,8 @@ import '@fontsource/manrope/800.css';
 
 import "@/App.css";
 import "@/index.css";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider } from "./context/AuthContext";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import { Toaster } from "./components/ui/sonner";
 import { AnalyticsProvider } from "./lib/analytics";
 import Header from "./components/Header";
@@ -38,6 +38,13 @@ import RedirectPage from "./pages/RedirectPage";
 import LimitedDealsPage from "./pages/LimitedDealsPage";
 import WishlistPage from "./pages/WishlistPage";
 
+function AdminRoute() {
+  const { user, loading, isAdmin } = useAuth();
+  if (loading) return null;
+  if (!user || !isAdmin) return <Navigate to="/" replace />;
+  return <AdminPage />;
+}
+
 function App() {
   return (
     <AuthProvider>
@@ -59,7 +66,7 @@ function App() {
                 <Route path="/wishlist" element={<WishlistPage />} />
                 <Route path="/deals/:pageType" element={<SeoPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
-                <Route path="/admin" element={<AdminPage />} />
+                <Route path="/admin" element={<AdminRoute />} />
                 <Route path="/coupons" element={<CouponsPage />} />
                 <Route path="/blog" element={<BlogPage />} />
                 <Route path="/blog/:slug" element={<BlogPostPage />} />

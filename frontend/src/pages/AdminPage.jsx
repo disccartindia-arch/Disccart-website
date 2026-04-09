@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Tag, Upload, Link2, FileText, BookOpen,
   Plus, Pencil, Trash2, X, Loader2, FileSpreadsheet,
   ExternalLink, ImagePlus, Search, Globe, Eye, EyeOff,
-  Store, SlidersHorizontal
+  Store, SlidersHorizontal, Image
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -28,7 +28,8 @@ import {
   getBlogPosts, createBlogPost, updateBlogPost, deleteBlogPost,
   uploadImage, resolveImageUrl,
   getStores, createStore, updateStore, deleteStore,
-  getFilterConfig, updateFilterConfig
+  getFilterConfig, updateFilterConfig,
+  getAdminSlides, createSlide, updateSlide, deleteSlide
 } from '../lib/api';
 import { AdminSEO } from '../components/SEO';
 
@@ -43,6 +44,7 @@ export default function AdminPage() {
   const [pages, setPages] = useState([]);
   const [blogPosts, setBlogPosts] = useState([]);
   const [stores, setStores] = useState([]);
+  const [slides, setSlides] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -60,6 +62,7 @@ export default function AdminPage() {
   const [showPageDialog, setShowPageDialog] = useState(false);
   const [showBlogDialog, setShowBlogDialog] = useState(false);
   const [showStoreDialog, setShowStoreDialog] = useState(false);
+  const [showSlideDialog, setShowSlideDialog] = useState(false);
 
   // Edit State
   const [editingItem, setEditingItem] = useState(null);
@@ -73,14 +76,15 @@ export default function AdminPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [couponsData, analyticsData, categoriesData, linksData, pagesData, blogData, storesData] = await Promise.all([
+      const [couponsData, analyticsData, categoriesData, linksData, pagesData, blogData, storesData, slidesData] = await Promise.all([
         getCoupons({ limit: 100 }),
         getAnalyticsOverview().catch(() => null),
         getCategories().catch(() => []),
         getPrettyLinks().catch(() => []),
         getPages().catch(() => []),
         getBlogPosts(false).catch(() => []),
-        getStores().catch(() => [])
+        getStores().catch(() => []),
+        getAdminSlides().catch(() => [])
       ]);
       setCoupons(Array.isArray(couponsData) ? couponsData : []);
       setAnalytics(analyticsData);
@@ -89,6 +93,7 @@ export default function AdminPage() {
       setPages(Array.isArray(pagesData) ? pagesData : []);
       setBlogPosts(Array.isArray(blogData) ? blogData : []);
       setStores(Array.isArray(storesData) ? storesData : []);
+      setSlides(Array.isArray(slidesData) ? slidesData : []);
     } catch (error) {
       console.error(error);
       toast.error('Failed to load data');
@@ -159,6 +164,7 @@ export default function AdminPage() {
       if (type === 'coupon') await deleteCoupon(id);
       if (type === 'category') await deleteCategory(id);
       if (type === 'store') await deleteStore(id);
+      if (type === 'slide') await deleteSlide(id);
       if (type === 'link') await deletePrettyLink(id);
       if (type === 'page') await deletePage(id);
       if (type === 'blog') await deleteBlogPost(id);
@@ -213,6 +219,7 @@ export default function AdminPage() {
     { id: 'coupons', label: 'Deals & Coupons', icon: Tag },
     { id: 'categories', label: 'Categories', icon: Plus },
     { id: 'stores', label: 'Stores', icon: Store },
+    { id: 'slider', label: 'Homepage Slider', icon: Image },
     { id: 'filters', label: 'Filter Settings', icon: SlidersHorizontal },
     { id: 'upload', label: 'Bulk Import', icon: Upload },
     { id: 'links', label: 'Pretty Links', icon: Link2 },
@@ -441,6 +448,45 @@ export default function AdminPage() {
               </motion.div>
             )}
 
+            {activeTab === 'slider' && (
+              <motion.div key="slider" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 space-y-6" data-testid="slider-tab">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-bold">Homepage Slider</h2>
+                  <Button onClick={() => { setEditingItem(null); setShowSlideDialog(true); }} className="bg-[#ee922c]" data-testid="add-slide-btn">
+                    <Plus className="w-4 h-4 mr-2" /> Add Slide
+                  </Button>
+                </div>
+                <p className="text-sm text-gray-500">Maximum 5 active slides. Drag order by setting the order number.</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {slides.map((slide) => (
+                    <div key={slide.id} className={`border rounded-2xl overflow-hidden ${slide.is_active ? 'border-green-300' : 'border-gray-200 opacity-60'}`} data-testid={`slide-card-${slide.id}`}>
+                      <div className="aspect-[3/1] bg-gray-100 relative">
+                        {slide.image_url ? (
+                          <img src={slide.image_url} alt={`Slide ${slide.order}`} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="flex items-center justify-center h-full text-gray-300"><Image className="w-12 h-12" /></div>
+                        )}
+                        <div className="absolute top-2 right-2 flex gap-1">
+                          <span className={`text-xs font-bold px-2 py-1 rounded-full ${slide.is_active ? 'bg-green-500 text-white' : 'bg-gray-500 text-white'}`}>
+                            {slide.is_active ? 'Active' : 'Inactive'}
+                          </span>
+                          <span className="text-xs font-bold px-2 py-1 rounded-full bg-black/60 text-white">#{slide.order || 0}</span>
+                        </div>
+                      </div>
+                      <div className="p-4 flex items-center justify-between">
+                        <div className="text-sm text-gray-500 truncate max-w-[200px]">{slide.redirect_url || 'No link'}</div>
+                        <div className="flex gap-2">
+                          <Button variant="outline" size="sm" onClick={() => { setEditingItem(slide); setShowSlideDialog(true); }} data-testid={`edit-slide-${slide.id}`}><Pencil className="w-4 h-4" /></Button>
+                          <Button variant="outline" size="sm" className="text-red-500" onClick={() => handleDelete('slide', slide.id, `Slide #${slide.order}`)} data-testid={`delete-slide-${slide.id}`}><Trash2 className="w-4 h-4" /></Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {slides.length === 0 && <p className="text-gray-400 col-span-2 text-center py-12">No slides added yet.</p>}
+                </div>
+              </motion.div>
+            )}
+
             {activeTab === 'filters' && (
               <FilterSettingsTab categories={categories} stores={stores} onRefresh={fetchData} />
             )}
@@ -620,6 +666,16 @@ export default function AdminPage() {
             <DialogDescription>Manage store name, logo, and filter visibility.</DialogDescription>
           </DialogHeader>
           <StoreForm item={editingItem} onSuccess={() => { setShowStoreDialog(false); fetchData(); }} />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showSlideDialog} onOpenChange={setShowSlideDialog}>
+        <DialogContent className="rounded-3xl">
+          <DialogHeader>
+            <DialogTitle>{editingItem ? 'Edit Slide' : 'Add Slide'}</DialogTitle>
+            <DialogDescription>Upload a banner image and set a redirect link. Max 5 active slides.</DialogDescription>
+          </DialogHeader>
+          <SlideForm item={editingItem} onSuccess={() => { setShowSlideDialog(false); fetchData(); }} />
         </DialogContent>
       </Dialog>
     </div>
@@ -1125,5 +1181,78 @@ function FilterSettingsTab({ categories, stores, onRefresh }) {
         </div>
       </div>
     </motion.div>
+  );
+}
+
+
+function SlideForm({ item, onSuccess }) {
+  const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [form, setForm] = useState({
+    image_url: item?.image_url || '',
+    redirect_url: item?.redirect_url || '',
+    is_active: item?.is_active ?? true,
+    order: item?.order ?? 1
+  });
+  const [preview, setPreview] = useState(item?.image_url || null);
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowed.includes(file.type)) { toast.error('Use JPG, PNG, or WebP'); return; }
+    if (file.size > 2 * 1024 * 1024) { toast.error('Max 2MB'); return; }
+    setPreview(URL.createObjectURL(file));
+    setUploading(true);
+    try {
+      const url = await uploadImage(file);
+      setForm(prev => ({ ...prev, image_url: url }));
+      toast.success('Image uploaded');
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Upload failed');
+      setPreview(item?.image_url || null);
+    } finally { setUploading(false); }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!form.image_url) { toast.error('Upload an image first'); return; }
+    setLoading(true);
+    try {
+      if (item) await updateSlide(item.id, form);
+      else await createSlide(form);
+      toast.success('Slide saved');
+      onSuccess();
+    } catch (err) {
+      toast.error(err?.response?.data?.detail || 'Failed to save slide');
+    } finally { setLoading(false); }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4 pt-4" data-testid="slide-form">
+      <div>
+        <Label className="text-sm font-bold mb-2 block">Slide Image</Label>
+        {preview && <img src={preview} alt="Preview" className="w-full aspect-[3/1] object-cover rounded-xl mb-2 border" />}
+        <label className="flex items-center gap-2 border-2 border-dashed rounded-xl p-4 cursor-pointer hover:bg-gray-50 transition-colors">
+          <ImagePlus className="w-5 h-5 text-gray-400" />
+          <span className="text-sm text-gray-500">{uploading ? 'Uploading...' : 'Click to upload image'}</span>
+          <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} disabled={uploading} />
+        </label>
+      </div>
+      <Input placeholder="Redirect URL (deal or affiliate link)" value={form.redirect_url} onChange={e => setForm({ ...form, redirect_url: e.target.value })} data-testid="slide-redirect-input" />
+      <div className="flex gap-4">
+        <div className="flex-1">
+          <Label className="text-sm font-bold mb-1 block">Order (1-5)</Label>
+          <Input type="number" min={1} max={5} value={form.order} onChange={e => setForm({ ...form, order: parseInt(e.target.value, 10) || 1 })} data-testid="slide-order-input" />
+        </div>
+        <div className="flex items-end gap-2 pb-1">
+          <input type="checkbox" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })} data-testid="slide-active-toggle" />
+          <Label>Active</Label>
+        </div>
+      </div>
+      <Button type="submit" className="w-full h-12" disabled={loading || uploading} data-testid="slide-save-btn">
+        {loading ? <Loader2 className="animate-spin" /> : 'Save Slide'}
+      </Button>
+    </form>
   );
 }

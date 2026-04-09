@@ -21,6 +21,15 @@ const api = axios.create({
   }
 });
 
+// Attach auth token to all requests
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -285,6 +294,32 @@ export const updateFilterConfig = async (filterData) => {
 
 export const getFilteredDeals = async (params = {}) => {
   const { data } = await api.get('/deals/filtered', { params });
+  return data;
+};
+
+// ===================== SLIDES =====================
+export const getSlides = async () => {
+  const { data } = await api.get('/slides');
+  return Array.isArray(data) ? data : [];
+};
+
+export const getAdminSlides = async () => {
+  const { data } = await api.get('/admin/slides');
+  return Array.isArray(data) ? data : [];
+};
+
+export const createSlide = async (slideData) => {
+  const { data } = await api.post('/admin/slides', slideData);
+  return data;
+};
+
+export const updateSlide = async (id, slideData) => {
+  const { data } = await api.patch(`/admin/slides/${id}`, slideData);
+  return data;
+};
+
+export const deleteSlide = async (id) => {
+  const { data } = await api.delete(`/admin/slides/${id}`);
   return data;
 };
 

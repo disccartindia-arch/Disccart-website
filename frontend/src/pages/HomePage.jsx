@@ -6,6 +6,7 @@ import { getCoupons, getCategories } from '../lib/api';
 import DealCard from '../components/DealCard';
 import CategoryPills from '../components/CategoryPills';
 import FilterDrawer from '../components/FilterDrawer';
+import HeroSlider from '../components/HeroSlider';
 import { HomeSEO } from '../components/SEO';
 
 export default function HomePage() {
@@ -81,6 +82,13 @@ export default function HomePage() {
               </Link>
             </div>
           </motion.div>
+        </div>
+      </section>
+
+      {/* Hero Slider */}
+      <section className="py-4">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <HeroSlider />
         </div>
       </section>
 

@@ -27,12 +27,20 @@ MONGO_URL = os.getenv("MONGO_URL")
 JWT_SECRET = os.getenv("JWT_SECRET", "disccart_secret_2026_key")
 
 # Cloudinary config
-cloudinary.config(
-    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
-    api_key=os.getenv("CLOUDINARY_API_KEY"),
-    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
-    secure=True
-)
+_cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME")
+_api_key = os.getenv("CLOUDINARY_API_KEY")
+_api_secret = os.getenv("CLOUDINARY_API_SECRET")
+
+if _cloud_name and _api_key and _api_secret:
+    cloudinary.config(
+        cloud_name=_cloud_name,
+        api_key=_api_key,
+        api_secret=_api_secret,
+        secure=True
+    )
+    logger.info("Cloudinary configured successfully")
+else:
+    logger.warning("Cloudinary env vars missing — image uploads will fail")
 
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[os.getenv("DB_NAME", "disccart")]
@@ -156,19 +164,40 @@ def hash_password(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return bcrypt.checkpw(plain_password.encode("utf-8"), hashed_password.encode("utf-8"))
 
-def create_access_token(user_id: str, email: str):
+def create_access_token(user_id: str, email: str, role: str):
     payload = {
         "user_id": user_id,
         "email": email,
+        "role": role,
         "exp": datetime.now(timezone.utc) + timedelta(hours=24)
     }
     return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
 
+async def get_current_user(request: Request):
+    auth_header = request.headers.get("Authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Not authenticated")
+    token = auth_header.split(" ", 1)[1]
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidTokenError:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+async def admin_required(request: Request):
+    user = await get_current_user(request)
+    if user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
 # ===================== AUTH ROUTES =====================
 
 @api_router.get("/auth/me")
-async def get_me():
-    return {"email": "disccartindia@gmail.com", "role": "admin"}
+async def get_me(request: Request):
+    user = await get_current_user(request)
+    return {"email": user["email"], "role": user.get("role", "user")}
 
 @api_router.post("/auth/login")
 async def login(data: UserLogin):
@@ -176,10 +205,30 @@ async def login(data: UserLogin):
     if not user or not verify_password(data.password, user["password_hash"]):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    token = create_access_token(str(user["_id"]), user["email"])
+    role = user.get("role", "user")
+    token = create_access_token(str(user["_id"]), user["email"], role)
     return {
         "token": token,
-        "user": {"id": str(user["_id"]), "email": user["email"], "role": "admin"}
+        "user": {"id": str(user["_id"]), "email": user["email"], "role": role}
+    }
+
+@api_router.post("/auth/register")
+async def register(data: UserLogin):
+    existing = await db.users.find_one({"email": data.email.lower()})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    user_doc = {
+        "email": data.email.lower(),
+        "password_hash": hash_password(data.password),
+        "role": "user",
+        "created_at": datetime.now(timezone.utc)
+    }
+    result = await db.users.insert_one(user_doc)
+    token = create_access_token(str(result.inserted_id), user_doc["email"], "user")
+    return {
+        "token": token,
+        "user": {"id": str(result.inserted_id), "email": user_doc["email"], "role": "user"}
     }
 
 # ===================== ANALYTICS =====================
@@ -343,6 +392,10 @@ async def bulk_upload(file: UploadFile = File(...)):
 
 @api_router.post("/upload-image")
 async def upload_image(image: UploadFile = File(...)):
+    # Check Cloudinary is configured
+    if not _api_key:
+        raise HTTPException(status_code=500, detail="Cloudinary not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET env vars.")
+
     # Validate file type
     allowed_types = ["image/jpeg", "image/png", "image/webp", "image/jpg", "image/gif"]
     if image.content_type and image.content_type not in allowed_types:
@@ -561,6 +614,7 @@ async def get_filter_config():
 
 @api_router.patch("/admin/filters")
 async def update_filter_config(request: Request):
+    await admin_required(request)
     data = await request.json()
 
     # Validate price brackets
@@ -662,6 +716,59 @@ async def get_filtered_deals(
         "category_counts": facet.get("category_counts", []),
         "total": total
     }
+
+# ===================== HOMEPAGE SLIDES =====================
+
+@api_router.get("/slides")
+async def get_slides():
+    slides = await db.homepage_slides.find({"is_active": True}).sort("order", 1).to_list(5)
+    for s in slides:
+        s["id"] = str(s.pop("_id"))
+    return slides
+
+@api_router.get("/admin/slides")
+async def get_all_slides(request: Request):
+    await admin_required(request)
+    slides = await db.homepage_slides.find().sort("order", 1).to_list(20)
+    for s in slides:
+        s["id"] = str(s.pop("_id"))
+    return slides
+
+@api_router.post("/admin/slides")
+async def create_slide(request: Request):
+    await admin_required(request)
+    data = await request.json()
+
+    active_count = await db.homepage_slides.count_documents({"is_active": True})
+    if data.get("is_active", True) and active_count >= 5:
+        raise HTTPException(status_code=400, detail="Maximum 5 active slides allowed")
+
+    data["created_at"] = datetime.now(timezone.utc)
+    result = await db.homepage_slides.insert_one(data)
+    return {"id": str(result.inserted_id), "status": "created"}
+
+@api_router.patch("/admin/slides/{slide_id}")
+async def update_slide(slide_id: str, request: Request):
+    await admin_required(request)
+    data = await request.json()
+    data.pop("_id", None)
+    data.pop("id", None)
+
+    if data.get("is_active"):
+        current = await db.homepage_slides.find_one({"_id": ObjectId(slide_id)})
+        if current and not current.get("is_active"):
+            active_count = await db.homepage_slides.count_documents({"is_active": True})
+            if active_count >= 5:
+                raise HTTPException(status_code=400, detail="Maximum 5 active slides allowed")
+
+    await db.homepage_slides.update_one({"_id": ObjectId(slide_id)}, {"$set": data})
+    return {"status": "updated"}
+
+@api_router.delete("/admin/slides/{slide_id}")
+async def delete_slide(slide_id: str, request: Request):
+    await admin_required(request)
+    await db.homepage_slides.delete_one({"_id": ObjectId(slide_id)})
+    return {"status": "deleted"}
 
 # ===================== APP CONFIG =====================
 
