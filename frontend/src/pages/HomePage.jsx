@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { getCoupons, getCategories } from '../lib/api';
 import DealCard from '../components/DealCard';
 import CategoryPills from '../components/CategoryPills';
+import FilterDrawer from '../components/FilterDrawer';
 import { HomeSEO } from '../components/SEO';
 
 export default function HomePage() {
@@ -222,6 +223,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <FilterDrawer onApply={() => {}} />
     </div>
   );
 }

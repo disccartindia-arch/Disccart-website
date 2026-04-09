@@ -14,6 +14,8 @@ import bcrypt
 import jwt
 import re
 import shutil
+import cloudinary
+import cloudinary.uploader
 from dotenv import load_dotenv
 
 # ===================== SETUP =====================
@@ -23,6 +25,14 @@ logger = logging.getLogger(__name__)
 
 MONGO_URL = os.getenv("MONGO_URL")
 JWT_SECRET = os.getenv("JWT_SECRET", "disccart_secret_2026_key")
+
+# Cloudinary config
+cloudinary.config(
+    cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET"),
+    secure=True
+)
 
 client = AsyncIOMotorClient(MONGO_URL)
 db = client[os.getenv("DB_NAME", "disccart")]
@@ -73,6 +83,7 @@ class CategoryCreate(BaseModel):
     description: Optional[str] = None
     image_url: Optional[str] = None
     background_image_url: Optional[str] = None
+    show_in_filter: bool = True
 
     @validator('slug', pre=True, always=True)
     def generate_slug(cls, v, values):
@@ -91,13 +102,13 @@ class CouponCreate(BaseModel):
     brand_name: str
     category_name: str
     code: Optional[str] = None
-    original_price: Optional[float] = None
-    discounted_price: Optional[float] = None
+    original_price: Optional[int] = None
+    discounted_price: Optional[int] = None
     affiliate_url: str
     discount_type: str = "percentage"
     discount_value: float = 0
     is_active: bool = True
-    offer_type: Optional[str] = "coupon"
+    offer_type: Optional[str] = None
     image_url: Optional[str] = None
     description: Optional[str] = None
     expires_at: Optional[str] = None
@@ -113,13 +124,13 @@ class CouponUpdate(BaseModel):
     title: str
     brand_name: str
     category_name: str
-    original_price: Optional[float] = None
-    discounted_price: Optional[float] = None
+    original_price: Optional[int] = None
+    discounted_price: Optional[int] = None
     affiliate_url: str
     image_url: Optional[str] = ""
     code: Optional[str] = None
     is_active: bool = True
-    offer_type: Optional[str] = "coupon"
+    offer_type: Optional[str] = None
     description: Optional[str] = None
     expires_at: Optional[str] = None
     discount_type: str = "percentage"
@@ -328,21 +339,24 @@ async def bulk_upload(file: UploadFile = File(...)):
         count += 1
     return {"message": f"Successfully uploaded {count} deals"}
 
-# ===================== IMAGE UPLOAD =====================
+# ===================== IMAGE UPLOAD (Cloudinary) =====================
 
 @api_router.post("/upload-image")
 async def upload_image(image: UploadFile = File(...)):
-    if not os.path.exists("uploads"):
-        os.makedirs("uploads")
-
-    # Add timestamp prefix to prevent filename collisions
-    timestamp = int(datetime.now(timezone.utc).timestamp())
-    safe_name = f"{timestamp}_{image.filename}"
-    file_path = f"uploads/{safe_name}"
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(image.file, buffer)
-
-    return {"url": f"/uploads/{safe_name}"}
+    try:
+        result = cloudinary.uploader.upload(
+            image.file,
+            folder="disccart",
+            resource_type="image",
+            format="webp",
+            transformation=[
+                {"quality": "auto", "fetch_format": "auto"}
+            ]
+        )
+        return {"url": result["secure_url"]}
+    except Exception as e:
+        logger.error(f"Cloudinary upload error: {e}")
+        raise HTTPException(status_code=500, detail="Image upload failed")
 
 # ===================== WISHLIST =====================
 
@@ -391,8 +405,8 @@ async def remove_from_wishlist(user_id: str, coupon_id: str):
 @api_router.get("/pretty-links")
 async def get_pretty_links():
     links = await db.pretty_links.find().to_list(500)
-    for l in links:
-        l["id"] = str(l.pop("_id"))
+    for link in links:
+        link["id"] = str(link.pop("_id"))
     return links
 
 @api_router.post("/pretty-links")
@@ -484,6 +498,161 @@ async def update_blog_post(post_id: str, request: Request):
 async def delete_blog_post(post_id: str):
     await db.blog_posts.delete_one({"_id": ObjectId(post_id)})
     return {"status": "deleted"}
+
+# ===================== STORES =====================
+
+@api_router.get("/stores")
+async def get_stores():
+    stores = await db.stores.find().to_list(500)
+    for s in stores:
+        s["id"] = str(s.pop("_id"))
+    return stores
+
+@api_router.post("/stores")
+async def create_store(request: Request):
+    data = await request.json()
+    data["show_in_filter"] = data.get("show_in_filter", True)
+    data["created_at"] = datetime.now(timezone.utc)
+    result = await db.stores.insert_one(data)
+    return {"id": str(result.inserted_id), "status": "created"}
+
+@api_router.put("/stores/{store_id}")
+async def update_store(store_id: str, request: Request):
+    data = await request.json()
+    data.pop("_id", None)
+    data.pop("id", None)
+    await db.stores.update_one({"_id": ObjectId(store_id)}, {"$set": data})
+    return {"status": "updated"}
+
+@api_router.delete("/stores/{store_id}")
+async def delete_store(store_id: str):
+    await db.stores.delete_one({"_id": ObjectId(store_id)})
+    return {"status": "deleted"}
+
+# ===================== FILTER CONFIG =====================
+
+@api_router.get("/admin/filters")
+async def get_filter_config():
+    config = await db.filter_configs.find_one({"_id": "global"})
+    price_brackets = config.get("price_brackets", []) if config else []
+
+    categories = await db.categories.find().to_list(500)
+    for c in categories:
+        c["id"] = str(c.pop("_id"))
+
+    stores = await db.stores.find().to_list(500)
+    for s in stores:
+        s["id"] = str(s.pop("_id"))
+
+    return {
+        "price_brackets": price_brackets,
+        "categories": categories,
+        "stores": stores
+    }
+
+@api_router.patch("/admin/filters")
+async def update_filter_config(request: Request):
+    data = await request.json()
+
+    # Validate price brackets
+    brackets = data.get("price_brackets")
+    if brackets is not None:
+        for b in brackets:
+            if b.get("min", 0) > b.get("max", 0):
+                raise HTTPException(status_code=400, detail=f"Invalid bracket: min ({b['min']}) > max ({b['max']})")
+        await db.filter_configs.update_one(
+            {"_id": "global"},
+            {"$set": {"price_brackets": brackets}},
+            upsert=True
+        )
+
+    # Update category show_in_filter flags
+    cat_updates = data.get("categories", [])
+    for cat in cat_updates:
+        cid = cat.get("id")
+        if cid:
+            await db.categories.update_one(
+                {"_id": ObjectId(cid)},
+                {"$set": {"show_in_filter": cat.get("show_in_filter", True)}}
+            )
+
+    # Update store show_in_filter flags
+    store_updates = data.get("stores", [])
+    for store in store_updates:
+        sid = store.get("id")
+        if sid:
+            await db.stores.update_one(
+                {"_id": ObjectId(sid)},
+                {"$set": {"show_in_filter": store.get("show_in_filter", True)}}
+            )
+
+    return {"status": "updated"}
+
+# ===================== FILTERED DEALS =====================
+
+@api_router.get("/deals/filtered")
+async def get_filtered_deals(
+    category: Optional[str] = None,
+    store: Optional[str] = None,
+    min_price: Optional[int] = None,
+    max_price: Optional[int] = None,
+    offer_type: Optional[str] = None,
+    limit: int = 50,
+    skip: int = 0
+):
+    match_stage = {"is_active": True}
+
+    if category and category not in ["All", "undefined", "null"]:
+        match_stage["category_name"] = {"$regex": category, "$options": "i"}
+
+    if store and store not in ["All", "undefined", "null"]:
+        match_stage["brand_name"] = {"$regex": f"^{re.escape(store)}$", "$options": "i"}
+
+    if offer_type and offer_type not in ["undefined", "null"]:
+        match_stage["offer_type"] = {"$regex": offer_type, "$options": "i"}
+
+    # Price filtering: check both discounted_price and original_price
+    if min_price is not None or max_price is not None:
+        price_cond = {}
+        if min_price is not None:
+            price_cond["$gte"] = min_price
+        if max_price is not None:
+            price_cond["$lte"] = max_price
+        match_stage["$or"] = [
+            {"discounted_price": price_cond},
+            {"discounted_price": {"$in": [None, 0]}, "original_price": price_cond}
+        ]
+
+    pipeline = [
+        {"$match": match_stage},
+        {"$facet": {
+            "results": [
+                {"$sort": {"created_at": -1}},
+                {"$skip": skip},
+                {"$limit": limit}
+            ],
+            "category_counts": [
+                {"$group": {"_id": "$category_name", "count": {"$sum": 1}}}
+            ],
+            "total": [{"$count": "count"}]
+        }}
+    ]
+
+    cursor = db.coupons.aggregate(pipeline)
+    facet_result = await cursor.to_list(1)
+    facet = facet_result[0] if facet_result else {"results": [], "category_counts": [], "total": []}
+
+    results = facet.get("results", [])
+    for r in results:
+        r["id"] = str(r.pop("_id"))
+
+    total = facet["total"][0]["count"] if facet.get("total") else 0
+
+    return {
+        "deals": results,
+        "category_counts": facet.get("category_counts", []),
+        "total": total
+    }
 
 # ===================== APP CONFIG =====================
 

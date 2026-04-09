@@ -251,4 +251,41 @@ export const removeFromWishlist = async (userId, couponId) => {
   return data;
 };
 
+// ===================== STORES =====================
+export const getStores = async () => {
+  const { data } = await api.get('/stores');
+  return Array.isArray(data) ? data : [];
+};
+
+export const createStore = async (storeData) => {
+  const { data } = await api.post('/stores', storeData);
+  return data;
+};
+
+export const updateStore = async (id, storeData) => {
+  const { data } = await api.put(`/stores/${id}`, storeData);
+  return data;
+};
+
+export const deleteStore = async (id) => {
+  const { data } = await api.delete(`/stores/${id}`);
+  return data;
+};
+
+// ===================== FILTERS =====================
+export const getFilterConfig = async () => {
+  const { data } = await api.get('/admin/filters');
+  return data;
+};
+
+export const updateFilterConfig = async (filterData) => {
+  const { data } = await api.patch('/admin/filters', filterData);
+  return data;
+};
+
+export const getFilteredDeals = async (params = {}) => {
+  const { data } = await api.get('/deals/filtered', { params });
+  return data;
+};
+
 export default api;

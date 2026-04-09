@@ -2,28 +2,42 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Clock, Zap, Tag, Timer } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { getCoupons } from '../lib/api';
+import { getCoupons, getFilteredDeals } from '../lib/api';
 import DealCard from '../components/DealCard';
+import FilterDrawer from '../components/FilterDrawer';
 import SEO from '../components/SEO';
 
 export default function DealsPage() {
   const [deals, setDeals] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeFilters, setActiveFilters] = useState({});
 
-  useEffect(() => {
-    const fetchDeals = async () => {
-      try {
+  const fetchDeals = async (filters = {}) => {
+    setLoading(true);
+    try {
+      const hasFilters = Object.keys(filters).length > 0;
+      if (hasFilters) {
+        const result = await getFilteredDeals(filters);
+        setDeals(Array.isArray(result.deals) ? result.deals : []);
+      } else {
         const data = await getCoupons({ limit: 50 });
         setDeals(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error('Failed to fetch deals:', error);
-        setDeals([]);
-      } finally {
-        setLoading(false);
       }
-    };
-    fetchDeals();
-  }, []);
+    } catch (error) {
+      console.error('Failed to fetch deals:', error);
+      setDeals([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchDeals(activeFilters);
+  }, [activeFilters]);
+
+  const handleFilterApply = (filters) => {
+    setActiveFilters(filters);
+  };
 
   return (
     <div className="pb-20 md:pb-8" data-testid="deals-page">
@@ -106,6 +120,8 @@ export default function DealsPage() {
           )}
         </div>
       </section>
+
+      <FilterDrawer onApply={handleFilterApply} />
     </div>
   );
 }

@@ -4,7 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Tag, Upload, Link2, FileText, BookOpen,
   Plus, Pencil, Trash2, X, Loader2, FileSpreadsheet,
-  ExternalLink, ImagePlus, Search, Globe, Eye, EyeOff
+  ExternalLink, ImagePlus, Search, Globe, Eye, EyeOff,
+  Store, SlidersHorizontal
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -25,7 +26,9 @@ import {
   getPrettyLinks, createPrettyLink, updatePrettyLink, deletePrettyLink,
   getPages, createPage, updatePage, deletePage,
   getBlogPosts, createBlogPost, updateBlogPost, deleteBlogPost,
-  uploadImage, resolveImageUrl
+  uploadImage, resolveImageUrl,
+  getStores, createStore, updateStore, deleteStore,
+  getFilterConfig, updateFilterConfig
 } from '../lib/api';
 import { AdminSEO } from '../components/SEO';
 
@@ -39,6 +42,7 @@ export default function AdminPage() {
   const [prettyLinks, setPrettyLinks] = useState([]);
   const [pages, setPages] = useState([]);
   const [blogPosts, setBlogPosts] = useState([]);
+  const [stores, setStores] = useState([]);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -55,6 +59,7 @@ export default function AdminPage() {
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [showPageDialog, setShowPageDialog] = useState(false);
   const [showBlogDialog, setShowBlogDialog] = useState(false);
+  const [showStoreDialog, setShowStoreDialog] = useState(false);
 
   // Edit State
   const [editingItem, setEditingItem] = useState(null);
@@ -68,13 +73,14 @@ export default function AdminPage() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const [couponsData, analyticsData, categoriesData, linksData, pagesData, blogData] = await Promise.all([
+      const [couponsData, analyticsData, categoriesData, linksData, pagesData, blogData, storesData] = await Promise.all([
         getCoupons({ limit: 100 }),
         getAnalyticsOverview().catch(() => null),
         getCategories().catch(() => []),
         getPrettyLinks().catch(() => []),
         getPages().catch(() => []),
-        getBlogPosts(false).catch(() => [])
+        getBlogPosts(false).catch(() => []),
+        getStores().catch(() => [])
       ]);
       setCoupons(Array.isArray(couponsData) ? couponsData : []);
       setAnalytics(analyticsData);
@@ -82,6 +88,7 @@ export default function AdminPage() {
       setPrettyLinks(Array.isArray(linksData) ? linksData : []);
       setPages(Array.isArray(pagesData) ? pagesData : []);
       setBlogPosts(Array.isArray(blogData) ? blogData : []);
+      setStores(Array.isArray(storesData) ? storesData : []);
     } catch (error) {
       console.error(error);
       toast.error('Failed to load data');
@@ -151,6 +158,7 @@ export default function AdminPage() {
     try {
       if (type === 'coupon') await deleteCoupon(id);
       if (type === 'category') await deleteCategory(id);
+      if (type === 'store') await deleteStore(id);
       if (type === 'link') await deletePrettyLink(id);
       if (type === 'page') await deletePage(id);
       if (type === 'blog') await deleteBlogPost(id);
@@ -204,6 +212,8 @@ export default function AdminPage() {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'coupons', label: 'Deals & Coupons', icon: Tag },
     { id: 'categories', label: 'Categories', icon: Plus },
+    { id: 'stores', label: 'Stores', icon: Store },
+    { id: 'filters', label: 'Filter Settings', icon: SlidersHorizontal },
     { id: 'upload', label: 'Bulk Import', icon: Upload },
     { id: 'links', label: 'Pretty Links', icon: Link2 },
     { id: 'pages', label: 'Pages', icon: FileText },
@@ -334,11 +344,11 @@ export default function AdminPage() {
                         <TableCell><span className="px-2 py-1 bg-gray-100 rounded-md text-xs font-bold">{c.brand_name}</span></TableCell>
                         <TableCell>
                           <div className="flex flex-wrap gap-1">
-                            {(c.offer_type || 'deal').split(',').map(t => t.trim()).filter(Boolean).map(t => (
+                            {c.offer_type ? (c.offer_type).split(',').map(t => t.trim()).filter(Boolean).map(t => (
                               <span key={t} className={`px-2 py-0.5 rounded-md text-xs font-bold ${t === 'deal' ? 'bg-green-100 text-green-700' : t === 'limited' ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}`}>
                                 {t === 'deal' ? 'Deal' : t === 'limited' ? 'Limited' : 'Coupon'}
                               </span>
-                            ))}
+                            )) : <span className="text-xs text-gray-400">—</span>}
                           </div>
                         </TableCell>
                         <TableCell className="text-green-700 font-bold">{c.discounted_price ? `₹${c.discounted_price}` : '-'}</TableCell>
@@ -390,6 +400,49 @@ export default function AdminPage() {
                   ))}
                 </div>
               </motion.div>
+            )}
+
+            {activeTab === 'stores' && (
+              <motion.div key="stores" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 space-y-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-2xl font-bold">Stores</h2>
+                  <Button onClick={() => { setEditingItem(null); setShowStoreDialog(true); }} className="bg-[#ee922c]">
+                    <Plus className="w-4 h-4 mr-2" /> Add Store
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {stores.map((store) => (
+                    <div key={store.id} className="border rounded-2xl p-4 flex items-center justify-between" data-testid={`store-card-${store.id}`}>
+                      <div className="flex items-center gap-4">
+                        {store.logo_url ? (
+                          <div className="w-14 h-14 rounded-xl overflow-hidden border bg-gray-100 flex-shrink-0">
+                            <img src={store.logo_url} alt={store.name} className="w-full h-full object-cover" />
+                          </div>
+                        ) : (
+                          <div className="w-14 h-14 rounded-xl bg-gray-100 border flex items-center justify-center flex-shrink-0">
+                            <Store className="w-5 h-5 text-gray-300" />
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-bold text-lg">{store.name}</p>
+                          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${store.show_in_filter !== false ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                            {store.show_in_filter !== false ? 'Visible in filter' : 'Hidden'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button variant="outline" size="sm" onClick={() => { setEditingItem(store); setShowStoreDialog(true); }} data-testid={`edit-store-${store.id}`}><Pencil className="w-4 h-4" /></Button>
+                        <Button variant="outline" size="sm" className="text-red-500" onClick={() => handleDelete('store', store.id, store.name)} data-testid={`delete-store-${store.id}`}><Trash2 className="w-4 h-4" /></Button>
+                      </div>
+                    </div>
+                  ))}
+                  {stores.length === 0 && <p className="text-gray-400 col-span-3 text-center py-12">No stores added yet.</p>}
+                </div>
+              </motion.div>
+            )}
+
+            {activeTab === 'filters' && (
+              <FilterSettingsTab categories={categories} stores={stores} onRefresh={fetchData} />
             )}
 
             {activeTab === 'upload' && (
@@ -546,6 +599,13 @@ export default function AdminPage() {
           <BlogForm item={editingItem} onSuccess={() => { setShowBlogDialog(false); fetchData(); }} />
         </DialogContent>
       </Dialog>
+
+      <Dialog open={showStoreDialog} onOpenChange={setShowStoreDialog}>
+        <DialogContent className="rounded-3xl">
+          <DialogHeader><DialogTitle>{editingItem ? 'Edit Store' : 'Add Store'}</DialogTitle></DialogHeader>
+          <StoreForm item={editingItem} onSuccess={() => { setShowStoreDialog(false); fetchData(); }} />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -569,7 +629,7 @@ function CouponForm({ item, categories, onSuccess }) {
     discounted_price: item?.discounted_price || '',
     affiliate_url: item?.affiliate_url || '',
     code: item?.code || '',
-    offer_type: item?.offer_type || 'deal',
+    offer_type: item?.offer_type || '',
     is_active: item?.is_active ?? true
   });
 
@@ -607,9 +667,10 @@ function CouponForm({ item, categories, onSuccess }) {
       const payload = {
         ...form,
         image_url: imageUrl || null,
-        category_name: form.category_name.join(","), // convert array → string
-        original_price: form.original_price === '' ? null : parseFloat(form.original_price),
-        discounted_price: form.discounted_price === '' ? null : parseFloat(form.discounted_price)
+        category_name: form.category_name.join(","),
+        offer_type: form.offer_type || null,
+        original_price: form.original_price === '' ? null : parseInt(form.original_price, 10),
+        discounted_price: form.discounted_price === '' ? null : parseInt(form.discounted_price, 10)
       };
 
       if (item) await updateCoupon(item.id, payload);
@@ -696,7 +757,7 @@ function CouponForm({ item, categories, onSuccess }) {
                     const updated = isChecked
                       ? current.filter(v => v !== opt.value)
                       : [...current, opt.value];
-                    setForm({ ...form, offer_type: updated.join(',') || 'deal' });
+                    setForm({ ...form, offer_type: updated.join(',') || '' });
                   }}
                 />
                 <span className="text-sm font-semibold">{opt.label}</span>
@@ -875,5 +936,163 @@ function BlogForm({ item, onSuccess }) {
       </div>
       <Button type="submit" className="w-full" disabled={loading}>Save Post</Button>
     </form>
+  );
+}
+
+
+function StoreForm({ item, onSuccess }) {
+  const [loading, setLoading] = useState(false);
+  const [form, setForm] = useState({
+    name: item?.name || '',
+    logo_url: item?.logo_url || '',
+    show_in_filter: item?.show_in_filter ?? true
+  });
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      if (item) await updateStore(item.id, form);
+      else await createStore(form);
+      toast.success('Store saved');
+      onSuccess();
+    } catch { toast.error('Failed to save store'); } finally { setLoading(false); }
+  };
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4 pt-4" data-testid="store-form">
+      <Input placeholder="Store Name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required data-testid="store-name-input" />
+      <Input placeholder="Logo URL (optional)" value={form.logo_url} onChange={e => setForm({ ...form, logo_url: e.target.value })} data-testid="store-logo-input" />
+      <div className="flex items-center gap-2">
+        <input type="checkbox" checked={form.show_in_filter} onChange={e => setForm({ ...form, show_in_filter: e.target.checked })} data-testid="store-filter-toggle" />
+        <Label>Show in filter</Label>
+      </div>
+      <Button type="submit" className="w-full h-12" disabled={loading} data-testid="store-save-btn">
+        {loading ? <Loader2 className="animate-spin" /> : 'Save Store'}
+      </Button>
+    </form>
+  );
+}
+
+function FilterSettingsTab({ categories, stores, onRefresh }) {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [brackets, setBrackets] = useState([]);
+  const [catFilters, setCatFilters] = useState([]);
+  const [storeFilters, setStoreFilters] = useState([]);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const data = await getFilterConfig();
+        setBrackets(data.price_brackets || []);
+        setCatFilters((data.categories || []).map(c => ({ id: c.id, name: c.name, show_in_filter: c.show_in_filter !== false })));
+        setStoreFilters((data.stores || []).map(s => ({ id: s.id, name: s.name, show_in_filter: s.show_in_filter !== false })));
+      } catch { toast.error('Failed to load filter config'); }
+      finally { setLoading(false); }
+    })();
+  }, [categories, stores]);
+
+  const addBracket = () => {
+    setBrackets([...brackets, { label: '', min: 0, max: 0 }]);
+  };
+
+  const removeBracket = (idx) => {
+    setBrackets(brackets.filter((_, i) => i !== idx));
+  };
+
+  const updateBracket = (idx, field, value) => {
+    const updated = [...brackets];
+    updated[idx] = { ...updated[idx], [field]: field === 'label' ? value : parseInt(value, 10) || 0 };
+    setBrackets(updated);
+  };
+
+  const toggleCatFilter = (id) => {
+    setCatFilters(prev => prev.map(c => c.id === id ? { ...c, show_in_filter: !c.show_in_filter } : c));
+  };
+
+  const toggleStoreFilter = (id) => {
+    setStoreFilters(prev => prev.map(s => s.id === id ? { ...s, show_in_filter: !s.show_in_filter } : s));
+  };
+
+  const handleSave = async () => {
+    setError('');
+    for (const b of brackets) {
+      if (b.min > b.max) {
+        setError(`Invalid bracket "${b.label || 'Untitled'}": min (${b.min}) cannot be greater than max (${b.max})`);
+        return;
+      }
+    }
+    setSaving(true);
+    try {
+      await updateFilterConfig({
+        price_brackets: brackets,
+        categories: catFilters.map(c => ({ id: c.id, show_in_filter: c.show_in_filter })),
+        stores: storeFilters.map(s => ({ id: s.id, show_in_filter: s.show_in_filter }))
+      });
+      toast.success('Filter settings saved');
+      onRefresh();
+    } catch { toast.error('Failed to save'); }
+    finally { setSaving(false); }
+  };
+
+  if (loading) return <div className="flex items-center justify-center p-20"><Loader2 className="w-8 h-8 animate-spin text-gray-400" /></div>;
+
+  return (
+    <motion.div key="filters" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 space-y-8" data-testid="filter-settings-tab">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Filter Settings</h2>
+        <Button onClick={handleSave} disabled={saving} className="bg-[#ee922c]" data-testid="save-filters-btn">
+          {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+          Save All Changes
+        </Button>
+      </div>
+
+      {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-semibold" data-testid="filter-error">{error}</div>}
+
+      {/* Price Brackets */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold">Price Brackets</h3>
+          <Button variant="outline" size="sm" onClick={addBracket} data-testid="add-bracket-btn"><Plus className="w-4 h-4 mr-1" /> Add Bracket</Button>
+        </div>
+        {brackets.length === 0 && <p className="text-gray-400 text-sm">No price brackets configured.</p>}
+        {brackets.map((b, idx) => (
+          <div key={idx} className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 border" data-testid={`bracket-row-${idx}`}>
+            <Input placeholder="Label (e.g. Under 500)" value={b.label} onChange={e => updateBracket(idx, 'label', e.target.value)} className="flex-1" />
+            <Input type="number" placeholder="Min" value={b.min} onChange={e => updateBracket(idx, 'min', e.target.value)} className="w-28" />
+            <span className="text-gray-400 font-bold">—</span>
+            <Input type="number" placeholder="Max" value={b.max} onChange={e => updateBracket(idx, 'max', e.target.value)} className="w-28" />
+            <Button variant="ghost" size="sm" className="text-red-500" onClick={() => removeBracket(idx)}><Trash2 className="w-4 h-4" /></Button>
+          </div>
+        ))}
+      </div>
+
+      {/* Category Filter Toggles */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-bold">Category Visibility in Filters</h3>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {catFilters.map(c => (
+            <label key={c.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${c.show_in_filter ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`} data-testid={`cat-filter-${c.id}`}>
+              <input type="checkbox" checked={c.show_in_filter} onChange={() => toggleCatFilter(c.id)} className="rounded" />
+              <span className="font-semibold text-sm">{c.name}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      {/* Store Filter Toggles */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-bold">Store Visibility in Filters</h3>
+        {storeFilters.length === 0 && <p className="text-gray-400 text-sm">No stores added yet. Add stores from the Stores tab.</p>}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          {storeFilters.map(s => (
+            <label key={s.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${s.show_in_filter ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`} data-testid={`store-filter-${s.id}`}>
+              <input type="checkbox" checked={s.show_in_filter} onChange={() => toggleStoreFilter(s.id)} className="rounded" />
+              <span className="font-semibold text-sm">{s.name}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+    </motion.div>
   );
 }
