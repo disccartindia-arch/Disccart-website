@@ -8,6 +8,7 @@ import CategoryPills from '../components/CategoryPills';
 import HeroSlider from '../components/HeroSlider';
 import { HomeSEO } from '../components/SEO';
 import { DealCardSkeleton, CategoryCardSkeleton } from '../components/Skeletons';
+import FilterDrawer from '../components/FilterDrawer';
 
 const DEALS_PER_PAGE = 12;
 
@@ -333,6 +334,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <FilterDrawer onApply={() => {}} />
     </div>
   );
 }
