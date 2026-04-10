@@ -30,6 +30,14 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
   - Scroll-to-Top Button: Floating button (vertically centered right side), appears after 300px scroll
   - Coupon Page Filtering Fix: /api/coupons-only now only returns deals with non-null/non-empty code field
   - Filter Refresh Bug Fix: DealsPage clears cached data, shows loading, handles race conditions via filterVersion ref
+- Phase 19: Performance Optimization (April 10, 2026)
+  - Backend In-Memory TTL Cache: MemoryCache class with deals (5min), stores (30min), categories (1hr) TTLs
+  - Cache auto-invalidation on all admin mutations (create/update/delete coupons, categories, stores, slides, hero, trending config)
+  - Categories endpoint optimized: N+1 queries → single aggregation pipeline
+  - Cache-Control headers: public APIs get `s-maxage=60, stale-while-revalidate=300`; admin APIs get `no-cache, no-store`
+  - Independent section loading: HomePage sections (featured, trending, categories, limited, hero) load in parallel with own loading states
+  - Skeleton Loading UI: DealCardSkeleton, StoreCardSkeleton, CouponCardSkeleton, CategoryCardSkeleton components
+  - FilterDrawer preserved on HomePage
 
 ## Key API Endpoints
 - POST /api/auth/login, POST /api/auth/register, GET /api/auth/me
