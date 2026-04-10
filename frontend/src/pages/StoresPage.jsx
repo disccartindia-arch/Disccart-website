@@ -5,6 +5,8 @@ import { motion } from 'framer-motion';
 import { getStores, getFeaturedStores } from '../lib/api';
 import SEO from '../components/SEO';
 
+import { StoreCardSkeleton } from '../components/Skeletons';
+
 export default function StoresPage() {
   const [stores, setStores] = useState([]);
   const [featured, setFeatured] = useState([]);
@@ -96,7 +98,7 @@ export default function StoresPage() {
           <h2 className="text-xl font-bold mb-4">{search ? `Results for "${search}"` : 'All Stores'} <span className="text-sm font-normal text-gray-400">({filtered.length})</span></h2>
           {loading ? (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-              {[...Array(12)].map((_, i) => <div key={i} className="h-36 rounded-2xl bg-gray-100 animate-pulse" />)}
+              {[...Array(12)].map((_, i) => <StoreCardSkeleton key={i} />)}
             </div>
           ) : filtered.length === 0 ? (
             <p className="text-gray-400 text-center py-12">No stores found.</p>

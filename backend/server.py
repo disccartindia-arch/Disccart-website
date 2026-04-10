@@ -1,5 +1,6 @@
 from fastapi import FastAPI, APIRouter, Request, HTTPException, UploadFile, File, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel, EmailStr, validator
@@ -10,6 +11,9 @@ import os
 import logging
 import csv
 import io
+import time
+import hashlib
+import json as json_module
 import bcrypt
 import jwt
 import re
@@ -22,6 +26,43 @@ from dotenv import load_dotenv
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# ===================== IN-MEMORY CACHE =====================
+class MemoryCache:
+    def __init__(self):
+        self._store = {}
+
+    def get(self, key):
+        if key in self._store:
+            value, expiry = self._store[key]
+            if time.time() < expiry:
+                return value
+            del self._store[key]
+        return None
+
+    def set(self, key, value, ttl):
+        self._store[key] = (value, time.time() + ttl)
+
+    def invalidate(self, *patterns):
+        if not patterns:
+            self._store.clear()
+            return
+        keys_to_del = [k for k in self._store if any(p in k for p in patterns)]
+        for k in keys_to_del:
+            del self._store[k]
+
+    def make_key(self, prefix, **kwargs):
+        filtered = {k: v for k, v in sorted(kwargs.items()) if v is not None}
+        suffix = hashlib.md5(json_module.dumps(filtered, default=str).encode()).hexdigest()[:12]
+        return f"{prefix}:{suffix}"
+
+cache = MemoryCache()
+
+CACHE_DEALS = 300       # 5 minutes
+CACHE_TRENDING = 300    # 5 minutes
+CACHE_STORES = 1800     # 30 minutes
+CACHE_CATEGORIES = 3600 # 1 hour
+CACHE_CONFIG = 3600     # 1 hour
 
 MONGO_URL = os.getenv("MONGO_URL")
 JWT_SECRET = os.getenv("JWT_SECRET", "disccart_secret_2026_key")
@@ -77,6 +118,22 @@ app.add_middleware(
 )
 
 api_router = APIRouter()
+
+# ===================== CACHE HEADER MIDDLEWARE =====================
+PUBLIC_CACHE_PREFIXES = [
+    "/api/coupons", "/api/categories", "/api/stores",
+    "/api/deals/", "/api/slides", "/api/hero-config"
+]
+
+@app.middleware("http")
+async def cache_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if request.method == "GET" and any(path.startswith(p) for p in PUBLIC_CACHE_PREFIXES) and "/admin/" not in path:
+        response.headers["Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=300"
+    elif "/admin/" in path:
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
 
 # ===================== MODELS =====================
 
@@ -143,18 +200,6 @@ class CouponUpdate(BaseModel):
     expires_at: Optional[str] = None
     discount_type: str = "percentage"
     discount_value: float = 0
-
-@api_router.put("/coupons/{coupon_id}")
-async def update_coupon(coupon_id: str, coupon: CouponUpdate):
-    update_data = coupon.dict()
-    result = await db.coupons.update_one(
-        {"_id": ObjectId(coupon_id)},
-        {"$set": update_data}
-    )
-    if result.matched_count == 0:
-        raise HTTPException(status_code=404, detail="Coupon not found")
-    return {"message": "Updated successfully"}
-    
 
 # ===================== AUTH UTILS =====================
 
@@ -247,21 +292,32 @@ async def get_analytics():
 
 @api_router.get("/categories")
 async def get_categories():
+    cached = cache.get("categories")
+    if cached is not None:
+        return cached
+
+    # Use aggregation to count deals per category in ONE query (avoids N+1)
+    count_pipeline = [
+        {"$match": {"is_active": True}},
+        {"$project": {"category_name": {"$toLower": "$category_name"}}},
+        {"$group": {"_id": "$category_name", "count": {"$sum": 1}}}
+    ]
+    counts_list = await db.coupons.aggregate(count_pipeline).to_list(1000)
+    count_map = {c["_id"]: c["count"] for c in counts_list}
+
     cats = await db.categories.find().to_list(100)
     result = []
     for c in cats:
         cat_name = c.get("name", "")
-        coupon_count = await db.coupons.count_documents({
-            "category_name": {"$regex": cat_name, "$options": "i"}
-        })
         cat_doc = {
             "id": str(c.pop("_id")),
-            "coupon_count": coupon_count,
+            "coupon_count": count_map.get(cat_name.lower(), 0),
         }
-        # Merge remaining fields excluding _id
         for k, v in c.items():
             cat_doc[k] = v
         result.append(cat_doc)
+
+    cache.set("categories", result, CACHE_CATEGORIES)
     return result
 
 @api_router.post("/categories")
@@ -269,6 +325,7 @@ async def add_cat(data: CategoryCreate):
     doc = data.model_dump()
     result = await db.categories.insert_one(doc)
     doc.pop("_id", None)
+    cache.invalidate("categories", "filter")
     return {"id": str(result.inserted_id), **doc}
 
 @api_router.put("/categories/{cat_id}")
@@ -278,6 +335,7 @@ async def update_cat(cat_id: str, data: CategoryCreate):
             {"_id": ObjectId(cat_id)},
             {"$set": data.model_dump()}
         )
+        cache.invalidate("categories", "filter")
         return {"status": "updated"}
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid ID format")
@@ -286,6 +344,7 @@ async def update_cat(cat_id: str, data: CategoryCreate):
 async def delete_cat(cat_id: str):
     try:
         await db.categories.delete_one({"_id": ObjectId(cat_id)})
+        cache.invalidate("categories", "filter")
         return {"message": "Deleted"}
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid ID format")
@@ -303,6 +362,15 @@ async def get_coupons(
     sort_by: Optional[str] = None,
     featured: Optional[bool] = None
 ):
+    # Skip cache for admin requests or searches
+    cache_key = None
+    if not isAdmin and not search:
+        cache_key = cache.make_key("coupons", category=category, offer_type=offer_type,
+                                    page=page, limit=limit, sort_by=sort_by, featured=featured)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
     query = {}
     if not isAdmin:
         query["is_active"] = True
@@ -336,12 +404,16 @@ async def get_coupons(
     for c in coupons:
         c["id"] = str(c.pop("_id"))
 
-    return {
+    result = {
         "deals": coupons,
         "total": total,
         "page": page,
         "has_more": (skip + limit) < total
     }
+
+    if cache_key:
+        cache.set(cache_key, result, CACHE_DEALS)
+    return result
 
 
 @api_router.get("/coupons-only")
@@ -352,6 +424,13 @@ async def get_coupons_only(
     limit: int = 50,
     page: int = 1
 ):
+    cache_key = None
+    if not search:
+        cache_key = cache.make_key("coupons_only", category=category, sort_by=sort_by, limit=limit, page=page)
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return cached
+
     query = {
         "is_active": True,
         "code": {"$ne": None, "$nin": [None, ""]}
@@ -378,6 +457,9 @@ async def get_coupons_only(
     coupons = await db.coupons.find(query).sort(list(sort_field.items())).skip(skip).limit(limit).to_list(limit)
     for c in coupons:
         c["id"] = str(c.pop("_id"))
+
+    if cache_key:
+        cache.set(cache_key, coupons, CACHE_DEALS)
     return coupons
 
 @api_router.post("/coupons")
@@ -385,11 +467,13 @@ async def create_coupon(data: CouponCreate):
     doc = data.model_dump()
     doc["created_at"] = datetime.now(timezone.utc)
     result = await db.coupons.insert_one(doc)
+    cache.invalidate("coupons", "deals", "trending", "categories")
     return {"id": str(result.inserted_id), "status": "success"}
 
 @api_router.delete("/coupons/{coupon_id}")
 async def delete_coupon(coupon_id: str):
     await db.coupons.delete_one({"_id": ObjectId(coupon_id)})
+    cache.invalidate("coupons", "deals", "trending", "categories")
     return {"status": "deleted"}
 
 @api_router.post("/coupons/bulk-delete")
@@ -405,7 +489,20 @@ async def bulk_delete_coupons(request: Request):
             deleted += result.deleted_count
         except Exception:
             pass
+    cache.invalidate("coupons", "deals", "trending", "categories")
     return {"deleted": deleted, "status": "success"}
+
+@api_router.put("/coupons/{coupon_id}")
+async def update_coupon(coupon_id: str, coupon: CouponUpdate):
+    update_data = coupon.dict()
+    result = await db.coupons.update_one(
+        {"_id": ObjectId(coupon_id)},
+        {"$set": update_data}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Coupon not found")
+    cache.invalidate("coupons", "deals", "trending", "categories")
+    return {"message": "Updated successfully"}
 
 # ===================== CLICK TRACKING =====================
 
@@ -631,12 +728,19 @@ async def delete_blog_post(post_id: str):
 
 @api_router.get("/stores")
 async def get_stores(featured: Optional[bool] = None):
+    cache_key = cache.make_key("stores", featured=featured)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     query = {}
     if featured:
         query["is_featured"] = True
     stores = await db.stores.find(query).sort("display_order", 1).to_list(500)
     for s in stores:
         s["id"] = str(s.pop("_id"))
+
+    cache.set(cache_key, stores, CACHE_STORES)
     return stores
 
 @api_router.get("/stores/slug/{slug}")
@@ -657,13 +761,20 @@ async def get_store_by_slug(slug: str):
 
 @api_router.get("/stores/featured")
 async def get_featured_stores():
+    cached = cache.get("stores_featured")
+    if cached is not None:
+        return cached
+
     featured = await db.stores.find({"is_featured": True, "is_active": {"$ne": False}}).sort("display_order", 1).to_list(10)
     for s in featured:
         s["id"] = str(s.pop("_id"))
     store_of_month = await db.stores.find_one({"is_store_of_month": True, "is_active": {"$ne": False}})
     if store_of_month:
         store_of_month["id"] = str(store_of_month.pop("_id"))
-    return {"featured": featured, "store_of_month": store_of_month}
+
+    result = {"featured": featured, "store_of_month": store_of_month}
+    cache.set("stores_featured", result, CACHE_STORES)
+    return result
 
 @api_router.post("/stores")
 async def create_store(request: Request):
@@ -682,6 +793,7 @@ async def create_store(request: Request):
     data["slug"] = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
     data["created_at"] = datetime.now(timezone.utc)
     result = await db.stores.insert_one(data)
+    cache.invalidate("stores", "filter")
     return {"id": str(result.inserted_id), "status": "created"}
 
 @api_router.put("/stores/{store_id}")
@@ -690,25 +802,29 @@ async def update_store(store_id: str, request: Request):
     data = await request.json()
     data.pop("_id", None)
     data.pop("id", None)
-    # Regenerate slug if name changed
     if "name" in data:
         data["slug"] = re.sub(r'[^a-z0-9]+', '-', data["name"].lower()).strip('-')
-    # If setting as store of month, unset others
     if data.get("is_store_of_month"):
         await db.stores.update_many({}, {"$set": {"is_store_of_month": False}})
     await db.stores.update_one({"_id": ObjectId(store_id)}, {"$set": data})
+    cache.invalidate("stores", "filter")
     return {"status": "updated"}
 
 @api_router.delete("/stores/{store_id}")
 async def delete_store(store_id: str, request: Request):
     await admin_required(request)
     await db.stores.delete_one({"_id": ObjectId(store_id)})
+    cache.invalidate("stores", "filter")
     return {"status": "deleted"}
 
 # ===================== FILTER CONFIG =====================
 
 @api_router.get("/admin/filters")
 async def get_filter_config():
+    cached = cache.get("filter_config")
+    if cached is not None:
+        return cached
+
     config = await db.filter_configs.find_one({"_id": "global"})
     price_brackets = config.get("price_brackets", []) if config else []
     discount_filters = config.get("discount_filters", []) if config else []
@@ -722,13 +838,15 @@ async def get_filter_config():
     for s in stores:
         s["id"] = str(s.pop("_id"))
 
-    return {
+    result = {
         "price_brackets": price_brackets,
         "discount_filters": discount_filters,
         "deal_type_filters": deal_type_filters,
         "categories": categories,
         "stores": stores
     }
+    cache.set("filter_config", result, CACHE_CONFIG)
+    return result
 
 @api_router.patch("/admin/filters")
 async def update_filter_config(request: Request):
@@ -784,6 +902,7 @@ async def update_filter_config(request: Request):
                 {"$set": {"show_in_filter": store.get("show_in_filter", True)}}
             )
 
+    cache.invalidate("filter", "categories", "stores")
     return {"status": "updated"}
 
 # ===================== FILTERED DEALS =====================
@@ -883,7 +1002,11 @@ async def get_filtered_deals(
 
 @api_router.get("/deals/trending")
 async def get_trending_deals(limit: int = 20, skip: int = 0):
-    # Get trending config
+    cache_key = cache.make_key("trending", limit=limit, skip=skip)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     config = await db.site_settings.find_one({"_id": "trending"})
     trending_hours = 24
     if config:
@@ -917,7 +1040,9 @@ async def get_trending_deals(limit: int = 20, skip: int = 0):
         r["id"] = str(r.pop("_id"))
 
     total = facet["total"][0]["count"] if facet.get("total") else 0
-    return {"deals": results, "total": total}
+    result = {"deals": results, "total": total}
+    cache.set(cache_key, result, CACHE_TRENDING)
+    return result
 
 @api_router.get("/admin/trending-config")
 async def get_trending_config(request: Request):
@@ -938,15 +1063,20 @@ async def update_trending_config(request: Request):
         {"$set": data},
         upsert=True
     )
+    cache.invalidate("trending")
     return {"status": "updated"}
 
 # ===================== HOMEPAGE SLIDES =====================
 
 @api_router.get("/slides")
 async def get_slides():
+    cached = cache.get("slides")
+    if cached is not None:
+        return cached
     slides = await db.homepage_slides.find({"is_active": True}).sort("order", 1).to_list(10)
     for s in slides:
         s["id"] = str(s.pop("_id"))
+    cache.set("slides", slides, CACHE_STORES)
     return slides
 
 @api_router.get("/admin/slides")
@@ -970,6 +1100,7 @@ async def create_slide(request: Request):
     data.setdefault("order", 1)
     data["created_at"] = datetime.now(timezone.utc)
     result = await db.homepage_slides.insert_one(data)
+    cache.invalidate("slides")
     return {"id": str(result.inserted_id), "status": "created"}
 
 @api_router.patch("/admin/slides/{slide_id}")
@@ -979,12 +1110,14 @@ async def update_slide(slide_id: str, request: Request):
     data.pop("_id", None)
     data.pop("id", None)
     await db.homepage_slides.update_one({"_id": ObjectId(slide_id)}, {"$set": data})
+    cache.invalidate("slides")
     return {"status": "updated"}
 
 @api_router.delete("/admin/slides/{slide_id}")
 async def delete_slide(slide_id: str, request: Request):
     await admin_required(request)
     await db.homepage_slides.delete_one({"_id": ObjectId(slide_id)})
+    cache.invalidate("slides")
     return {"status": "deleted"}
 
 # ===================== HERO CONFIG =====================
@@ -1012,12 +1145,17 @@ HERO_DEFAULTS = {
 
 @api_router.get("/hero-config")
 async def get_hero_config():
+    cached = cache.get("hero_config")
+    if cached is not None:
+        return cached
     config = await db.site_settings.find_one({"_id": "hero"})
     if not config:
+        cache.set("hero_config", HERO_DEFAULTS, CACHE_CONFIG)
         return HERO_DEFAULTS
     config.pop("_id", None)
     merged = {**HERO_DEFAULTS, **config}
     merged.pop("_id", None)
+    cache.set("hero_config", merged, CACHE_CONFIG)
     return merged
 
 @api_router.patch("/admin/hero-config")
@@ -1037,6 +1175,7 @@ async def update_hero_config(request: Request):
         {"$set": data},
         upsert=True
     )
+    cache.invalidate("hero")
     return {"status": "updated"}
 
 # ===================== APP CONFIG =====================

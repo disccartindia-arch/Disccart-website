@@ -4,6 +4,7 @@ import { Clock, Zap, Tag, Package } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getCoupons, getFilteredDeals } from '../lib/api';
 import DealCard from '../components/DealCard';
+import { DealCardSkeleton } from '../components/Skeletons';
 import FilterDrawer from '../components/FilterDrawer';
 import SEO from '../components/SEO';
 
@@ -116,7 +117,7 @@ export default function DealsPage() {
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {[...Array(12)].map((_, i) => (
-                <div key={i} className="bg-gray-200 rounded-2xl h-80 animate-pulse" />
+                <DealCardSkeleton key={i} />
               ))}
             </div>
           ) : deals.length > 0 ? (

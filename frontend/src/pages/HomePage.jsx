@@ -5,59 +5,73 @@ import { motion } from 'framer-motion';
 import { getCoupons, getCategories, getHeroConfig } from '../lib/api';
 import DealCard from '../components/DealCard';
 import CategoryPills from '../components/CategoryPills';
-import FilterDrawer from '../components/FilterDrawer';
 import HeroSlider from '../components/HeroSlider';
 import { HomeSEO } from '../components/SEO';
+import { DealCardSkeleton, CategoryCardSkeleton } from '../components/Skeletons';
 
 const DEALS_PER_PAGE = 12;
 
 export default function HomePage() {
+  // Independent loading states for each section
   const [featuredDeals, setFeaturedDeals] = useState([]);
+  const [featuredLoading, setFeaturedLoading] = useState(true);
+
   const [trendingDeals, setTrendingDeals] = useState([]);
-  const [limitedDeals, setLimitedDeals] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [hero, setHero] = useState(null);
+  const [trendingLoading, setTrendingLoading] = useState(true);
   const [trendingPage, setTrendingPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
+  const [limitedDeals, setLimitedDeals] = useState([]);
+  const [limitedLoading, setLimitedLoading] = useState(true);
+
+  const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
+
+  const [hero, setHero] = useState(null);
+  const [heroLoading, setHeroLoading] = useState(true);
+
+  // Each section loads independently — no blocking
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [featured, allData, cats, limited, heroData] = await Promise.all([
-          getCoupons({ featured: true, limit: 4, page: 1 }),
-          getCoupons({ limit: DEALS_PER_PAGE, page: 1 }),
-          getCategories(),
-          getCoupons({ offer_type: 'limited', limit: 6, page: 1 }),
-          getHeroConfig().catch(() => null)
-        ]);
+    // Hero config
+    getHeroConfig()
+      .then(data => { if (data) setHero(data); })
+      .catch(() => {})
+      .finally(() => setHeroLoading(false));
 
-        const featuredItems = allData?.deals || (Array.isArray(featured) ? featured : []);
-        setFeaturedDeals(Array.isArray(featured?.deals) ? featured.deals : (Array.isArray(featured) ? featured : []));
+    // Categories
+    getCategories()
+      .then(cats => setCategories(Array.isArray(cats) ? cats : []))
+      .catch(() => setCategories([]))
+      .finally(() => setCategoriesLoading(false));
 
-        const trendingItems = allData?.deals || (Array.isArray(allData) ? allData : []);
-        setTrendingDeals(trendingItems);
-        setHasMore(allData?.has_more || false);
+    // Featured deals
+    getCoupons({ featured: true, limit: 4, page: 1 })
+      .then(data => {
+        const items = data?.deals || (Array.isArray(data) ? data : []);
+        setFeaturedDeals(items);
+      })
+      .catch(() => setFeaturedDeals([]))
+      .finally(() => setFeaturedLoading(false));
 
-        setCategories(Array.isArray(cats) ? cats : []);
+    // Trending deals (main grid)
+    getCoupons({ limit: DEALS_PER_PAGE, page: 1 })
+      .then(data => {
+        const items = data?.deals || (Array.isArray(data) ? data : []);
+        setTrendingDeals(items);
+        setHasMore(data?.has_more || false);
+      })
+      .catch(() => setTrendingDeals([]))
+      .finally(() => setTrendingLoading(false));
 
-        const limitedItems = limited?.deals || (Array.isArray(limited) ? limited : []);
-        const limitedResults = limitedItems.filter(d => (d.offer_type || '').includes('limited'));
-        setLimitedDeals(limitedResults);
-
-        if (heroData) setHero(heroData);
-      } catch (error) {
-        console.error('Failed to fetch data:', error);
-        setFeaturedDeals([]);
-        setTrendingDeals([]);
-        setCategories([]);
-        setLimitedDeals([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+    // Limited time deals
+    getCoupons({ offer_type: 'limited', limit: 6, page: 1 })
+      .then(data => {
+        const items = data?.deals || (Array.isArray(data) ? data : []);
+        setLimitedDeals(items.filter(d => (d.offer_type || '').includes('limited')));
+      })
+      .catch(() => setLimitedDeals([]))
+      .finally(() => setLimitedLoading(false));
   }, []);
 
   const loadMore = async () => {
@@ -88,7 +102,8 @@ export default function HomePage() {
   return (
     <div className="pb-20 md:pb-8" data-testid="home-page">
       <HomeSEO />
-      {/* Hero Section */}
+
+      {/* Hero Section — renders immediately with defaults, updates when data arrives */}
       <section className="relative overflow-hidden py-8 md:py-12" style={{ background: hero?.bg_gradient || 'linear-gradient(135deg, #FFF8F0 0%, #F0F9F0 40%, #E8F5E9 65%, #FFF3E0 100%)' }}>
         {(hero?.show_floating_icons !== false) && (
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -96,12 +111,6 @@ export default function HomePage() {
           <div className="absolute top-20 right-10 w-40 h-40 rounded-full bg-orange-200/15 blur-2xl hero-float-medium" />
           <div className="absolute bottom-0 left-1/3 w-52 h-52 rounded-full bg-green-100/20 blur-3xl hero-float-reverse" />
           <div className="absolute -bottom-8 right-1/4 w-36 h-36 rounded-full bg-amber-100/15 blur-2xl hero-float-slow" />
-          <svg className="absolute top-[15%] left-[8%] w-8 h-8 text-green-400/[0.08] hero-float-medium" fill="currentColor" viewBox="0 0 24 24"><path d="M21.41 11.58l-9-9A2 2 0 0011 2H4a2 2 0 00-2 2v7c0 .55.22 1.05.59 1.42l9 9a2 2 0 002.82 0l7-7a2 2 0 000-2.84zM7 9a2 2 0 110-4 2 2 0 010 4z"/></svg>
-          <svg className="absolute top-[25%] right-[12%] w-10 h-10 text-orange-400/[0.07] hero-float-slow" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><text x="12" y="16" textAnchor="middle" fill="white" fontSize="10" fontWeight="bold">%</text></svg>
-          <svg className="absolute bottom-[20%] left-[15%] w-7 h-7 text-green-500/[0.06] hero-float-reverse" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-6h2v2h-2zm0-8h2v6h-2z"/></svg>
-          <svg className="absolute top-[60%] right-[20%] w-6 h-6 text-amber-400/[0.06] hero-float-medium" fill="currentColor" viewBox="0 0 24 24"><path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0020.01 4H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/></svg>
-          <svg className="absolute top-[40%] left-[75%] w-9 h-9 text-green-300/[0.05] hero-float-slow" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L1 21h22L12 2zm0 3.99L19.53 19H4.47L12 5.99z"/></svg>
-          <svg className="absolute bottom-[35%] left-[45%] w-6 h-6 text-orange-300/[0.06] hero-float-reverse" fill="currentColor" viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
           {(hero?.show_wave !== false) && (
           <svg className="absolute bottom-0 left-0 w-full h-16 text-green-100/30" viewBox="0 0 1440 60" fill="currentColor" preserveAspectRatio="none">
             <path d="M0,30 C360,60 720,0 1080,30 C1260,45 1380,15 1440,30 L1440,60 L0,60 Z" />
@@ -151,66 +160,80 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Featured Deals */}
-      {featuredDeals.length > 0 && (
-        <section className="py-6" data-testid="featured-section">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2">
+      {/* Featured Deals — loads independently */}
+      <section className="py-6" data-testid="featured-section">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {featuredLoading ? (
+            <>
+              <div className="flex items-center gap-2 mb-6">
                 <Zap className="w-6 h-6 text-[#ee922c]" />
                 <h2 className="font-display font-bold text-2xl text-gray-900">Featured Deals</h2>
               </div>
-              <Link to="/trending" className="text-[#ee922c] font-medium flex items-center gap-1 hover:gap-2 transition-all">
-                View All <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {loading
-                ? [...Array(4)].map((_, i) => (
-                    <div key={i} className="bg-gray-200 rounded-2xl h-80 animate-pulse" />
-                  ))
-                : featuredDeals.map((deal) => (
-                    <DealCard key={deal.id} deal={deal} />
-                  ))
-              }
-            </div>
-          </div>
-        </section>
-      )}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[...Array(4)].map((_, i) => <DealCardSkeleton key={i} />)}
+              </div>
+            </>
+          ) : featuredDeals.length > 0 ? (
+            <>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-2">
+                  <Zap className="w-6 h-6 text-[#ee922c]" />
+                  <h2 className="font-display font-bold text-2xl text-gray-900">Featured Deals</h2>
+                </div>
+                <Link to="/trending" className="text-[#ee922c] font-medium flex items-center gap-1 hover:gap-2 transition-all">
+                  View All <ArrowRight className="w-4 h-4" />
+                </Link>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {featuredDeals.map((deal) => (
+                  <DealCard key={deal.id} deal={deal} />
+                ))}
+              </div>
+            </>
+          ) : null}
+        </div>
+      </section>
 
-      {/* Category Cards */}
+      {/* Category Cards — loads independently */}
       <section className="py-8" data-testid="categories-section">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-2 mb-6">
             <Tag className="w-6 h-6 text-[#3c7b48]" />
             <h2 className="font-display font-bold text-2xl text-gray-900">Shop by Category</h2>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {categories.map((category) => (
-              <Link
-                key={category.id}
-                to={`/category/${category.slug}`}
-                className="relative aspect-square rounded-2xl overflow-hidden group"
-                data-testid={`category-card-${category.slug}`}
-              >
-                <img
-                  src={categoryImages[category.name] || category.image_url}
-                  alt={category.name}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
-                  <h3 className="font-display font-bold text-lg">{category.name}</h3>
-                  <p className="text-sm text-white/80">{category.coupon_count || 0} deals</p>
-                </div>
-              </Link>
-            ))}
-          </div>
+          {categoriesLoading ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {[...Array(6)].map((_, i) => <CategoryCardSkeleton key={i} />)}
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              {categories.map((category) => (
+                <Link
+                  key={category.id}
+                  to={`/category/${category.slug}`}
+                  className="relative aspect-square rounded-2xl overflow-hidden group"
+                  data-testid={`category-card-${category.slug}`}
+                >
+                  <img
+                    src={categoryImages[category.name] || category.image_url}
+                    alt={category.name}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                    loading="lazy"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
+                    <h3 className="font-display font-bold text-lg">{category.name}</h3>
+                    <p className="text-sm text-white/80">{category.coupon_count || 0} deals</p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
-      {/* Limited Time Offers */}
-      {limitedDeals.length > 0 && (
+      {/* Limited Time Offers — loads independently */}
+      {(limitedLoading || limitedDeals.length > 0) && (
         <section className="py-8" data-testid="limited-offers-section">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between mb-6">
@@ -224,16 +247,22 @@ export default function HomePage() {
                 View All <ArrowRight className="w-4 h-4" />
               </Link>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {limitedDeals.slice(0, 6).map((deal) => (
-                <DealCard key={deal.id} deal={deal} />
-              ))}
-            </div>
+            {limitedLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {[...Array(3)].map((_, i) => <DealCardSkeleton key={i} />)}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {limitedDeals.slice(0, 6).map((deal) => (
+                  <DealCard key={deal.id} deal={deal} />
+                ))}
+              </div>
+            )}
           </div>
         </section>
       )}
 
-      {/* Trending Deals with Load More */}
+      {/* Trending Deals with Load More — loads independently */}
       <section className="py-8" data-testid="trending-section">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-6">
@@ -245,19 +274,19 @@ export default function HomePage() {
               See All <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {loading
-              ? [...Array(8)].map((_, i) => (
-                  <div key={i} className="bg-gray-200 rounded-2xl h-80 animate-pulse" />
-                ))
-              : trendingDeals.map((deal) => (
-                  <DealCard key={deal.id} deal={deal} />
-                ))
-            }
-          </div>
+          {trendingLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {[...Array(8)].map((_, i) => <DealCardSkeleton key={i} />)}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+              {trendingDeals.map((deal) => (
+                <DealCard key={deal.id} deal={deal} />
+              ))}
+            </div>
+          )}
 
-          {/* Load More Button */}
-          {!loading && hasMore && (
+          {!trendingLoading && hasMore && (
             <div className="flex justify-center mt-8" data-testid="load-more-container">
               <button
                 onClick={loadMore}
@@ -304,8 +333,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
-      <FilterDrawer onApply={() => {}} />
     </div>
   );
 }

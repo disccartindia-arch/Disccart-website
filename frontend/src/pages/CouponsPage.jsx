@@ -6,6 +6,7 @@ import { DealScoreBadge, VerificationBadge } from '../components/DealCard';
 import CouponRevealModal from '../components/CouponRevealModal';
 import SEO from '../components/SEO';
 import { toast } from 'sonner';
+import { CouponCardSkeleton } from '../components/Skeletons';
 
 function CouponCard({ coupon }) {
   const [copied, setCopied] = useState(false);
@@ -281,7 +282,7 @@ export default function CouponsPage() {
           {loading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {[...Array(6)].map((_, i) => (
-                <div key={i} className="bg-gray-200 rounded-2xl h-64 animate-pulse" />
+                <CouponCardSkeleton key={i} />
               ))}
             </div>
           ) : coupons.length > 0 ? (
