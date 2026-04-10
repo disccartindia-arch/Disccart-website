@@ -7,62 +7,53 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
 - **Frontend**: React 18 + Vite 5, TailwindCSS, Shadcn UI, Framer Motion
 - **Backend**: FastAPI (Python), Motor (async MongoDB)
 - **Database**: MongoDB
-- **Auth**: JWT (Bearer token in localStorage)
+- **Auth**: JWT (Bearer token, role-based: admin/user)
 - **Image Hosting**: Cloudinary
 - **Analytics**: Google Analytics 4
 
 ## What's Implemented
-- Phase 1-12: Core MVP (auth, deals, admin, wishlist, bulk mgmt, AI scores, etc.)
-- Phase 13: Stability (.map crash fix, chunkSizeWarningLimit)
+- Phase 1-13: Core MVP (auth, deals, admin, wishlist, bulk mgmt, AI scores, stability)
 - Phase 14: Dynamic filters, Cloudinary, Stores CRUD, Filter drawer
-- Phase 15: Secure Auth + Slider (April 9, 2026)
-  - JWT auth with role-based access (admin/user)
-  - /auth/register endpoint (new users get role=user)
-  - /auth/me requires Bearer token (was hardcoded before)
-  - admin_required dependency on all admin routes (403 for non-admin)
-  - Frontend AdminRoute guard (redirects non-admin to /)
-  - Header hides Admin Panel link for non-admin users
-  - api.js interceptor attaches Bearer token to all requests
-  - Homepage Slider (homepage_slides collection, max 5 active)
-  - Admin Slider tab with image upload, redirect URL, order, active toggle
-  - HeroSlider component with auto-slide, pause/play, nav dots
-  - Cloudinary startup validation (clear error if env vars missing)
-  - Dialog accessibility (DialogDescription on all 7 dialogs)
+- Phase 15: Secure Auth (JWT roles), Homepage Slider, Dialog accessibility
+- Phase 16: Hero section editor (admin-controlled background/text/colors)
+- Phase 17: GrabOn-style upgrade (April 10, 2026)
+  - Advanced filter system: price brackets + discount filters + deal type filters (all with add/edit/delete/enable/disable/reorder)
+  - Trending deals (24hr window logic + admin config for duration/toggle)
+  - Stores upgrade: slug, description, website_url, category, featured, store_of_month, display_order, logo upload
+  - Store pages: /stores listing (search, featured, store of month) + /stores/:slug detail with deals
+  - Slider upgrade: title, subtitle, btn_text, btn_link, bg_color, swipe support
+  - FilterDrawer: discount % filters, deal type filters
+  - Admin: Site Settings tab (trending config), upgraded Filter Settings, upgraded Store form, upgraded Slide form
+  - Header nav: Stores link added
 
 ## Key API Endpoints
-- POST /api/auth/login (returns JWT with role)
-- POST /api/auth/register (creates user with role=user)
-- GET /api/auth/me (requires Bearer token)
+- POST /api/auth/login, POST /api/auth/register, GET /api/auth/me
 - GET /api/categories, POST/PUT/DELETE /api/categories
-- GET /api/coupons, POST/PUT/DELETE /api/coupons
-- POST /api/coupons/bulk-delete
+- GET /api/coupons, POST/PUT/DELETE /api/coupons, POST /api/coupons/bulk-delete
 - POST /api/upload-image (Cloudinary)
-- GET /api/stores, POST/PUT/DELETE /api/stores/{id}
-- GET /api/admin/filters, PATCH /api/admin/filters (admin only)
-- GET /api/deals/filtered
-- GET /api/slides (public), GET/POST/PATCH/DELETE /api/admin/slides (admin only)
+- GET /api/stores, GET /api/stores/featured, GET /api/stores/slug/{slug}, POST/PUT/DELETE /api/stores
+- GET /api/admin/filters, PATCH /api/admin/filters (price/discount/deal-type/category/store)
+- GET /api/deals/filtered (category, store, price, discount%, deal_type, sort)
+- GET /api/deals/trending (24hr window)
+- GET/PATCH /api/admin/trending-config
+- GET /api/slides, GET/POST/PATCH/DELETE /api/admin/slides
+- GET /api/hero-config, PATCH /api/admin/hero-config
 - CRUD: /api/pretty-links, /api/pages, /api/blog
 - Wishlist: GET/POST/DELETE /api/wishlist/{user_id}
-- GET /api/analytics/overview
 
 ## DB Collections
-- `coupons`: {title, brand_name, category_name, code, affiliate_url, offer_type (nullable), image_url, original_price (int), discounted_price (int), expires_at, is_active}
-- `categories`: {name, slug, icon, image_url, background_image_url, show_in_filter}
-- `stores`: {name, logo_url, show_in_filter}
-- `filter_configs`: {_id: "global", price_brackets: [{label, min, max}]}
-- `homepage_slides`: {image_url, redirect_url, is_active, order}
-- `users`: {email, password_hash, role (admin|user), created_at}
+- `coupons`: {title, brand_name, category_name, code, affiliate_url, offer_type, image_url, original_price (int), discounted_price (int), discount_value, expires_at, is_active, clicks, created_at}
+- `categories`: {name, slug, icon, image_url, background_image_url, show_in_filter, display_order}
+- `stores`: {name, slug, logo_url, description, website_url, category, show_in_filter, is_active, is_featured, is_store_of_month, display_order}
+- `filter_configs`: {_id: "global", price_brackets, discount_filters, deal_type_filters}
+- `homepage_slides`: {image_url, title, subtitle, btn_text, btn_link, bg_color, redirect_url, is_active, order}
+- `site_settings`: {_id: "hero"|"trending", ...config}
+- `users`: {email, password_hash, role (admin|user)}
 - `wishlists`, `clicks`, `pretty_links`, `pages`, `blog_posts`
 
-## Environment Variables (Backend)
-- MONGO_URL, DB_NAME
-- JWT_SECRET
-- CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET
-- CORS_ORIGINS
-- ADMIN_EMAIL, ADMIN_PASSWORD
-
 ## Backlog
-- P1: Facebook Pixel tracking implementation
-- P2: Email capture popup for deal alerts
+- P1: Facebook Pixel tracking
+- P2: Email capture popup
 - P2: Push notifications (Firebase)
 - P2: "Best time to buy" hint
+- P3: Editor/Viewer role UI (backend RBAC ready)

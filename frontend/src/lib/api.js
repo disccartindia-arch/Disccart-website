@@ -261,9 +261,19 @@ export const removeFromWishlist = async (userId, couponId) => {
 };
 
 // ===================== STORES =====================
-export const getStores = async () => {
-  const { data } = await api.get('/stores');
+export const getStores = async (params = {}) => {
+  const { data } = await api.get('/stores', { params });
   return Array.isArray(data) ? data : [];
+};
+
+export const getStoreBySlug = async (slug) => {
+  const { data } = await api.get(`/stores/slug/${slug}`);
+  return data;
+};
+
+export const getFeaturedStores = async () => {
+  const { data } = await api.get('/stores/featured');
+  return data;
 };
 
 export const createStore = async (storeData) => {
@@ -294,6 +304,22 @@ export const updateFilterConfig = async (filterData) => {
 
 export const getFilteredDeals = async (params = {}) => {
   const { data } = await api.get('/deals/filtered', { params });
+  return data;
+};
+
+// ===================== TRENDING =====================
+export const getTrendingDeals = async (params = {}) => {
+  const { data } = await api.get('/deals/trending', { params });
+  return data;
+};
+
+export const getTrendingConfig = async () => {
+  const { data } = await api.get('/admin/trending-config');
+  return data;
+};
+
+export const updateTrendingConfig = async (configData) => {
+  const { data } = await api.patch('/admin/trending-config', configData);
   return data;
 };
 

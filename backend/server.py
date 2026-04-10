@@ -564,30 +564,78 @@ async def delete_blog_post(post_id: str):
 # ===================== STORES =====================
 
 @api_router.get("/stores")
-async def get_stores():
-    stores = await db.stores.find().to_list(500)
+async def get_stores(featured: Optional[bool] = None):
+    query = {}
+    if featured:
+        query["is_featured"] = True
+    stores = await db.stores.find(query).sort("display_order", 1).to_list(500)
     for s in stores:
         s["id"] = str(s.pop("_id"))
     return stores
 
+@api_router.get("/stores/slug/{slug}")
+async def get_store_by_slug(slug: str):
+    store = await db.stores.find_one({"slug": slug})
+    if not store:
+        raise HTTPException(status_code=404, detail="Store not found")
+    store["id"] = str(store.pop("_id"))
+    # Get deals for this store
+    deals = await db.coupons.find(
+        {"brand_name": {"$regex": f"^{re.escape(store['name'])}$", "$options": "i"}, "is_active": True}
+    ).sort("created_at", -1).to_list(100)
+    for d in deals:
+        d["id"] = str(d.pop("_id"))
+    store["deals"] = deals
+    store["deal_count"] = len(deals)
+    return store
+
+@api_router.get("/stores/featured")
+async def get_featured_stores():
+    featured = await db.stores.find({"is_featured": True, "is_active": {"$ne": False}}).sort("display_order", 1).to_list(10)
+    for s in featured:
+        s["id"] = str(s.pop("_id"))
+    store_of_month = await db.stores.find_one({"is_store_of_month": True, "is_active": {"$ne": False}})
+    if store_of_month:
+        store_of_month["id"] = str(store_of_month.pop("_id"))
+    return {"featured": featured, "store_of_month": store_of_month}
+
 @api_router.post("/stores")
 async def create_store(request: Request):
+    await admin_required(request)
     data = await request.json()
-    data["show_in_filter"] = data.get("show_in_filter", True)
+    data.setdefault("show_in_filter", True)
+    data.setdefault("is_active", True)
+    data.setdefault("is_featured", False)
+    data.setdefault("is_store_of_month", False)
+    data.setdefault("display_order", 0)
+    data.setdefault("description", "")
+    data.setdefault("website_url", "")
+    data.setdefault("category", "")
+    # Auto-generate slug
+    name = data.get("name", "")
+    data["slug"] = re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')
     data["created_at"] = datetime.now(timezone.utc)
     result = await db.stores.insert_one(data)
     return {"id": str(result.inserted_id), "status": "created"}
 
 @api_router.put("/stores/{store_id}")
 async def update_store(store_id: str, request: Request):
+    await admin_required(request)
     data = await request.json()
     data.pop("_id", None)
     data.pop("id", None)
+    # Regenerate slug if name changed
+    if "name" in data:
+        data["slug"] = re.sub(r'[^a-z0-9]+', '-', data["name"].lower()).strip('-')
+    # If setting as store of month, unset others
+    if data.get("is_store_of_month"):
+        await db.stores.update_many({}, {"$set": {"is_store_of_month": False}})
     await db.stores.update_one({"_id": ObjectId(store_id)}, {"$set": data})
     return {"status": "updated"}
 
 @api_router.delete("/stores/{store_id}")
-async def delete_store(store_id: str):
+async def delete_store(store_id: str, request: Request):
+    await admin_required(request)
     await db.stores.delete_one({"_id": ObjectId(store_id)})
     return {"status": "deleted"}
 
@@ -597,17 +645,21 @@ async def delete_store(store_id: str):
 async def get_filter_config():
     config = await db.filter_configs.find_one({"_id": "global"})
     price_brackets = config.get("price_brackets", []) if config else []
+    discount_filters = config.get("discount_filters", []) if config else []
+    deal_type_filters = config.get("deal_type_filters", []) if config else []
 
-    categories = await db.categories.find().to_list(500)
+    categories = await db.categories.find().sort("display_order", 1).to_list(500)
     for c in categories:
         c["id"] = str(c.pop("_id"))
 
-    stores = await db.stores.find().to_list(500)
+    stores = await db.stores.find().sort("display_order", 1).to_list(500)
     for s in stores:
         s["id"] = str(s.pop("_id"))
 
     return {
         "price_brackets": price_brackets,
+        "discount_filters": discount_filters,
+        "deal_type_filters": deal_type_filters,
         "categories": categories,
         "stores": stores
     }
@@ -616,6 +668,7 @@ async def get_filter_config():
 async def update_filter_config(request: Request):
     await admin_required(request)
     data = await request.json()
+    update_doc = {}
 
     # Validate price brackets
     brackets = data.get("price_brackets")
@@ -623,9 +676,25 @@ async def update_filter_config(request: Request):
         for b in brackets:
             if b.get("min", 0) > b.get("max", 0):
                 raise HTTPException(status_code=400, detail=f"Invalid bracket: min ({b['min']}) > max ({b['max']})")
+        update_doc["price_brackets"] = brackets
+
+    # Discount filters
+    discount_filters = data.get("discount_filters")
+    if discount_filters is not None:
+        for d in discount_filters:
+            if d.get("min", 0) > d.get("max", 0):
+                raise HTTPException(status_code=400, detail=f"Invalid discount: min ({d['min']}) > max ({d['max']})")
+        update_doc["discount_filters"] = discount_filters
+
+    # Deal type filters
+    deal_type_filters = data.get("deal_type_filters")
+    if deal_type_filters is not None:
+        update_doc["deal_type_filters"] = deal_type_filters
+
+    if update_doc:
         await db.filter_configs.update_one(
             {"_id": "global"},
-            {"$set": {"price_brackets": brackets}},
+            {"$set": update_doc},
             upsert=True
         )
 
@@ -660,8 +729,12 @@ async def get_filtered_deals(
     min_price: Optional[int] = None,
     max_price: Optional[int] = None,
     offer_type: Optional[str] = None,
+    min_discount: Optional[int] = None,
+    max_discount: Optional[int] = None,
+    deal_type: Optional[str] = None,
     limit: int = 50,
-    skip: int = 0
+    skip: int = 0,
+    sort_by: Optional[str] = None
 ):
     match_stage = {"is_active": True}
 
@@ -674,7 +747,10 @@ async def get_filtered_deals(
     if offer_type and offer_type not in ["undefined", "null"]:
         match_stage["offer_type"] = {"$regex": offer_type, "$options": "i"}
 
-    # Price filtering: check both discounted_price and original_price
+    if deal_type and deal_type not in ["undefined", "null"]:
+        match_stage["offer_type"] = {"$regex": deal_type, "$options": "i"}
+
+    # Price filtering
     if min_price is not None or max_price is not None:
         price_cond = {}
         if min_price is not None:
@@ -686,11 +762,31 @@ async def get_filtered_deals(
             {"discounted_price": {"$in": [None, 0]}, "original_price": price_cond}
         ]
 
+    # Discount percentage filtering
+    if min_discount is not None or max_discount is not None:
+        disc_cond = {}
+        if min_discount is not None:
+            disc_cond["$gte"] = min_discount
+        if max_discount is not None:
+            disc_cond["$lte"] = max_discount
+        match_stage["discount_value"] = disc_cond
+
+    # Sort logic
+    sort_field = {"created_at": -1}
+    if sort_by == "popularity":
+        sort_field = {"clicks": -1}
+    elif sort_by == "price_low":
+        sort_field = {"discounted_price": 1}
+    elif sort_by == "price_high":
+        sort_field = {"discounted_price": -1}
+    elif sort_by == "discount":
+        sort_field = {"discount_value": -1}
+
     pipeline = [
         {"$match": match_stage},
         {"$facet": {
             "results": [
-                {"$sort": {"created_at": -1}},
+                {"$sort": sort_field},
                 {"$skip": skip},
                 {"$limit": limit}
             ],
@@ -717,11 +813,72 @@ async def get_filtered_deals(
         "total": total
     }
 
+# ===================== TRENDING DEALS =====================
+
+@api_router.get("/deals/trending")
+async def get_trending_deals(limit: int = 20, skip: int = 0):
+    # Get trending config
+    config = await db.site_settings.find_one({"_id": "trending"})
+    trending_hours = 24
+    if config:
+        trending_hours = config.get("trending_duration_hours", 24)
+        if not config.get("trending_enabled", True):
+            return {"deals": [], "total": 0}
+
+    cutoff = datetime.now(timezone.utc) - timedelta(hours=trending_hours)
+
+    pipeline = [
+        {"$match": {
+            "is_active": True,
+            "created_at": {"$gte": cutoff}
+        }},
+        {"$facet": {
+            "results": [
+                {"$sort": {"clicks": -1, "created_at": -1}},
+                {"$skip": skip},
+                {"$limit": limit}
+            ],
+            "total": [{"$count": "count"}]
+        }}
+    ]
+
+    cursor = db.coupons.aggregate(pipeline)
+    facet_result = await cursor.to_list(1)
+    facet = facet_result[0] if facet_result else {"results": [], "total": []}
+
+    results = facet.get("results", [])
+    for r in results:
+        r["id"] = str(r.pop("_id"))
+
+    total = facet["total"][0]["count"] if facet.get("total") else 0
+    return {"deals": results, "total": total}
+
+@api_router.get("/admin/trending-config")
+async def get_trending_config(request: Request):
+    await admin_required(request)
+    config = await db.site_settings.find_one({"_id": "trending"})
+    if not config:
+        return {"trending_enabled": True, "trending_duration_hours": 24}
+    config.pop("_id", None)
+    return config
+
+@api_router.patch("/admin/trending-config")
+async def update_trending_config(request: Request):
+    await admin_required(request)
+    data = await request.json()
+    data.pop("_id", None)
+    await db.site_settings.update_one(
+        {"_id": "trending"},
+        {"$set": data},
+        upsert=True
+    )
+    return {"status": "updated"}
+
 # ===================== HOMEPAGE SLIDES =====================
 
 @api_router.get("/slides")
 async def get_slides():
-    slides = await db.homepage_slides.find({"is_active": True}).sort("order", 1).to_list(5)
+    slides = await db.homepage_slides.find({"is_active": True}).sort("order", 1).to_list(10)
     for s in slides:
         s["id"] = str(s.pop("_id"))
     return slides
@@ -738,11 +895,13 @@ async def get_all_slides(request: Request):
 async def create_slide(request: Request):
     await admin_required(request)
     data = await request.json()
-
-    active_count = await db.homepage_slides.count_documents({"is_active": True})
-    if data.get("is_active", True) and active_count >= 5:
-        raise HTTPException(status_code=400, detail="Maximum 5 active slides allowed")
-
+    data.setdefault("title", "")
+    data.setdefault("subtitle", "")
+    data.setdefault("btn_text", "")
+    data.setdefault("btn_link", "")
+    data.setdefault("bg_color", "#ee922c")
+    data.setdefault("is_active", True)
+    data.setdefault("order", 1)
     data["created_at"] = datetime.now(timezone.utc)
     result = await db.homepage_slides.insert_one(data)
     return {"id": str(result.inserted_id), "status": "created"}
@@ -753,14 +912,6 @@ async def update_slide(slide_id: str, request: Request):
     data = await request.json()
     data.pop("_id", None)
     data.pop("id", None)
-
-    if data.get("is_active"):
-        current = await db.homepage_slides.find_one({"_id": ObjectId(slide_id)})
-        if current and not current.get("is_active"):
-            active_count = await db.homepage_slides.count_documents({"is_active": True})
-            if active_count >= 5:
-                raise HTTPException(status_code=400, detail="Maximum 5 active slides allowed")
-
     await db.homepage_slides.update_one({"_id": ObjectId(slide_id)}, {"$set": data})
     return {"status": "updated"}
 

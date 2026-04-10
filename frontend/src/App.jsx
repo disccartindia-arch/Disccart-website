@@ -37,6 +37,8 @@ import DealsPage from "./pages/DealsPage";
 import RedirectPage from "./pages/RedirectPage";
 import LimitedDealsPage from "./pages/LimitedDealsPage";
 import WishlistPage from "./pages/WishlistPage";
+import StoresPage from "./pages/StoresPage";
+import StoreDetailPage from "./pages/StoreDetailPage";
 
 function AdminRoute() {
   const { user, loading, isAdmin } = useAuth();
@@ -63,6 +65,8 @@ function App() {
                 <Route path="/search" element={<SearchPage />} />
                 <Route path="/deals" element={<DealsPage />} />
                 <Route path="/deals/limited-time" element={<LimitedDealsPage />} />
+                <Route path="/stores" element={<StoresPage />} />
+                <Route path="/stores/:slug" element={<StoreDetailPage />} />
                 <Route path="/wishlist" element={<WishlistPage />} />
                 <Route path="/deals/:pageType" element={<SeoPage />} />
                 <Route path="/profile" element={<ProfilePage />} />

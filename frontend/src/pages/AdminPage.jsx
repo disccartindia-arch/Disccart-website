@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Tag, Upload, Link2, FileText, BookOpen,
   Plus, Pencil, Trash2, X, Loader2, FileSpreadsheet,
   ExternalLink, ImagePlus, Search, Globe, Eye, EyeOff,
-  Store, SlidersHorizontal, Image, Palette
+  Store, SlidersHorizontal, Image, Palette, Flame, Settings
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -30,7 +30,8 @@ import {
   getStores, createStore, updateStore, deleteStore,
   getFilterConfig, updateFilterConfig,
   getAdminSlides, createSlide, updateSlide, deleteSlide,
-  getHeroConfig, updateHeroConfig
+  getHeroConfig, updateHeroConfig,
+  getTrendingConfig, updateTrendingConfig
 } from '../lib/api';
 import { AdminSEO } from '../components/SEO';
 
@@ -222,6 +223,7 @@ export default function AdminPage() {
     { id: 'stores', label: 'Stores', icon: Store },
     { id: 'slider', label: 'Homepage Slider', icon: Image },
     { id: 'hero', label: 'Hero Editor', icon: Palette },
+    { id: 'settings', label: 'Site Settings', icon: Settings },
     { id: 'filters', label: 'Filter Settings', icon: SlidersHorizontal },
     { id: 'upload', label: 'Bulk Import', icon: Upload },
     { id: 'links', label: 'Pretty Links', icon: Link2 },
@@ -491,6 +493,10 @@ export default function AdminPage() {
 
             {activeTab === 'hero' && (
               <HeroEditorTab />
+            )}
+
+            {activeTab === 'settings' && (
+              <SiteSettingsTab />
             )}
 
             {activeTab === 'filters' && (
@@ -1035,30 +1041,73 @@ function BlogForm({ item, onSuccess }) {
 
 function StoreForm({ item, onSuccess }) {
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [form, setForm] = useState({
     name: item?.name || '',
     logo_url: item?.logo_url || '',
-    show_in_filter: item?.show_in_filter ?? true
+    description: item?.description || '',
+    website_url: item?.website_url || '',
+    category: item?.category || '',
+    show_in_filter: item?.show_in_filter ?? true,
+    is_active: item?.is_active ?? true,
+    is_featured: item?.is_featured ?? false,
+    is_store_of_month: item?.is_store_of_month ?? false,
+    display_order: item?.display_order ?? 0
   });
+
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await uploadImage(file);
+      setForm(prev => ({ ...prev, logo_url: url }));
+      toast.success('Logo uploaded');
+    } catch { toast.error('Upload failed'); }
+    finally { setUploading(false); }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!form.name.trim()) { toast.error('Store name required'); return; }
     setLoading(true);
     try {
       if (item) await updateStore(item.id, form);
       else await createStore(form);
       toast.success('Store saved');
       onSuccess();
-    } catch { toast.error('Failed to save store'); } finally { setLoading(false); }
+    } catch (err) { toast.error(err?.response?.data?.detail || 'Failed to save'); }
+    finally { setLoading(false); }
   };
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 pt-4" data-testid="store-form">
+    <form onSubmit={handleSubmit} className="space-y-4 pt-4 max-h-[65vh] overflow-y-auto" data-testid="store-form">
       <Input placeholder="Store Name" value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} required data-testid="store-name-input" />
-      <Input placeholder="Logo URL (optional)" value={form.logo_url} onChange={e => setForm({ ...form, logo_url: e.target.value })} data-testid="store-logo-input" />
-      <div className="flex items-center gap-2">
-        <input type="checkbox" checked={form.show_in_filter} onChange={e => setForm({ ...form, show_in_filter: e.target.checked })} data-testid="store-filter-toggle" />
-        <Label>Show in filter</Label>
+      <Input placeholder="Description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} />
+      <Input placeholder="Website URL" value={form.website_url} onChange={e => setForm({ ...form, website_url: e.target.value })} />
+      <Input placeholder="Category (e.g. Fashion)" value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} />
+
+      <div>
+        <Label className="text-sm font-bold mb-1 block">Store Logo</Label>
+        <div className="flex items-center gap-3">
+          {form.logo_url && <img src={form.logo_url} alt="" className="w-14 h-14 rounded-xl border object-contain p-1" />}
+          <label className="flex items-center gap-2 border-2 border-dashed rounded-xl px-4 py-2 cursor-pointer hover:bg-gray-50 text-sm text-gray-500 flex-1">
+            <ImagePlus className="w-4 h-4" /> {uploading ? 'Uploading...' : 'Upload Logo'}
+            <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} disabled={uploading} />
+          </label>
+        </div>
       </div>
-      <Button type="submit" className="w-full h-12" disabled={loading} data-testid="store-save-btn">
+
+      <Input type="number" placeholder="Display Order" value={form.display_order} onChange={e => setForm({ ...form, display_order: parseInt(e.target.value, 10) || 0 })} />
+
+      <div className="space-y-2">
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })} /> Active</label>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.show_in_filter} onChange={e => setForm({ ...form, show_in_filter: e.target.checked })} /> Show in Filters</label>
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.is_featured} onChange={e => setForm({ ...form, is_featured: e.target.checked })} /> Featured Store</label>
+        <label className="flex items-center gap-2 text-sm font-bold text-yellow-700"><input type="checkbox" checked={form.is_store_of_month} onChange={e => setForm({ ...form, is_store_of_month: e.target.checked })} /> Store of the Month</label>
+      </div>
+
+      <Button type="submit" className="w-full h-12" disabled={loading || uploading} data-testid="store-save-btn">
         {loading ? <Loader2 className="animate-spin" /> : 'Save Store'}
       </Button>
     </form>
@@ -1069,6 +1118,8 @@ function FilterSettingsTab({ categories, stores, onRefresh }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [brackets, setBrackets] = useState([]);
+  const [discountFilters, setDiscountFilters] = useState([]);
+  const [dealTypeFilters, setDealTypeFilters] = useState([]);
   const [catFilters, setCatFilters] = useState([]);
   const [storeFilters, setStoreFilters] = useState([]);
   const [error, setError] = useState('');
@@ -1078,6 +1129,8 @@ function FilterSettingsTab({ categories, stores, onRefresh }) {
       try {
         const data = await getFilterConfig();
         setBrackets(data.price_brackets || []);
+        setDiscountFilters(data.discount_filters || []);
+        setDealTypeFilters(data.deal_type_filters || []);
         setCatFilters((data.categories || []).map(c => ({ id: c.id, name: c.name, show_in_filter: c.show_in_filter !== false })));
         setStoreFilters((data.stores || []).map(s => ({ id: s.id, name: s.name, show_in_filter: s.show_in_filter !== false })));
       } catch { toast.error('Failed to load filter config'); }
@@ -1085,40 +1138,23 @@ function FilterSettingsTab({ categories, stores, onRefresh }) {
     })();
   }, [categories, stores]);
 
-  const addBracket = () => {
-    setBrackets([...brackets, { label: '', min: 0, max: 0 }]);
+  const updateItem = (setter, idx, field, value) => {
+    setter(prev => { const u = [...prev]; u[idx] = { ...u[idx], [field]: field === 'label' || field === 'value' ? value : field === 'is_active' ? value : parseInt(value, 10) || 0 }; return u; });
   };
 
-  const removeBracket = (idx) => {
-    setBrackets(brackets.filter((_, i) => i !== idx));
-  };
-
-  const updateBracket = (idx, field, value) => {
-    const updated = [...brackets];
-    updated[idx] = { ...updated[idx], [field]: field === 'label' ? value : parseInt(value, 10) || 0 };
-    setBrackets(updated);
-  };
-
-  const toggleCatFilter = (id) => {
-    setCatFilters(prev => prev.map(c => c.id === id ? { ...c, show_in_filter: !c.show_in_filter } : c));
-  };
-
-  const toggleStoreFilter = (id) => {
-    setStoreFilters(prev => prev.map(s => s.id === id ? { ...s, show_in_filter: !s.show_in_filter } : s));
-  };
+  const toggleCatFilter = (id) => setCatFilters(prev => prev.map(c => c.id === id ? { ...c, show_in_filter: !c.show_in_filter } : c));
+  const toggleStoreFilter = (id) => setStoreFilters(prev => prev.map(s => s.id === id ? { ...s, show_in_filter: !s.show_in_filter } : s));
 
   const handleSave = async () => {
     setError('');
-    for (const b of brackets) {
-      if (b.min > b.max) {
-        setError(`Invalid bracket "${b.label || 'Untitled'}": min (${b.min}) cannot be greater than max (${b.max})`);
-        return;
-      }
-    }
+    for (const b of brackets) { if (b.min > b.max) { setError(`Price bracket "${b.label}": min > max`); return; } }
+    for (const d of discountFilters) { if (d.min > d.max) { setError(`Discount "${d.label}": min > max`); return; } }
     setSaving(true);
     try {
       await updateFilterConfig({
         price_brackets: brackets,
+        discount_filters: discountFilters,
+        deal_type_filters: dealTypeFilters,
         categories: catFilters.map(c => ({ id: c.id, show_in_filter: c.show_in_filter })),
         stores: storeFilters.map(s => ({ id: s.id, show_in_filter: s.show_in_filter }))
       });
@@ -1140,32 +1176,42 @@ function FilterSettingsTab({ categories, stores, onRefresh }) {
         </Button>
       </div>
 
-      {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-semibold" data-testid="filter-error">{error}</div>}
+      {error && <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm font-semibold">{error}</div>}
 
       {/* Price Brackets */}
+      <FilterSection title="Price Brackets" items={brackets} setItems={setBrackets} updateItem={updateItem} fields={['label', 'min', 'max']} addLabel="Add Bracket" />
+
+      {/* Discount Filters */}
+      <FilterSection title="Discount Filters" items={discountFilters} setItems={setDiscountFilters} updateItem={updateItem} fields={['label', 'min', 'max']} addLabel="Add Discount" minLabel="Min %" maxLabel="Max %" />
+
+      {/* Deal Type Filters */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-bold">Price Brackets</h3>
-          <Button variant="outline" size="sm" onClick={addBracket} data-testid="add-bracket-btn"><Plus className="w-4 h-4 mr-1" /> Add Bracket</Button>
+          <h3 className="text-lg font-bold">Deal Type Filters</h3>
+          <Button variant="outline" size="sm" onClick={() => setDealTypeFilters([...dealTypeFilters, { label: '', value: '', is_active: true, display_order: dealTypeFilters.length }])}>
+            <Plus className="w-4 h-4 mr-1" /> Add Type
+          </Button>
         </div>
-        {brackets.length === 0 && <p className="text-gray-400 text-sm">No price brackets configured.</p>}
-        {brackets.map((b, idx) => (
-          <div key={idx} className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 border" data-testid={`bracket-row-${idx}`}>
-            <Input placeholder="Label (e.g. Under 500)" value={b.label} onChange={e => updateBracket(idx, 'label', e.target.value)} className="flex-1" />
-            <Input type="number" placeholder="Min" value={b.min} onChange={e => updateBracket(idx, 'min', e.target.value)} className="w-28" />
-            <span className="text-gray-400 font-bold">—</span>
-            <Input type="number" placeholder="Max" value={b.max} onChange={e => updateBracket(idx, 'max', e.target.value)} className="w-28" />
-            <Button variant="ghost" size="sm" className="text-red-500" onClick={() => removeBracket(idx)}><Trash2 className="w-4 h-4" /></Button>
+        {dealTypeFilters.map((t, idx) => (
+          <div key={idx} className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 border">
+            <Input placeholder="Label (e.g. Coupons)" value={t.label} onChange={e => updateItem(setDealTypeFilters, idx, 'label', e.target.value)} className="flex-1" />
+            <Input placeholder="Value (e.g. coupon)" value={t.value} onChange={e => updateItem(setDealTypeFilters, idx, 'value', e.target.value)} className="w-32" />
+            <Input type="number" placeholder="Order" value={t.display_order || 0} onChange={e => updateItem(setDealTypeFilters, idx, 'display_order', e.target.value)} className="w-20" />
+            <label className="flex items-center gap-1 text-xs font-bold cursor-pointer">
+              <input type="checkbox" checked={t.is_active !== false} onChange={e => updateItem(setDealTypeFilters, idx, 'is_active', e.target.checked)} />
+              On
+            </label>
+            <Button variant="ghost" size="sm" className="text-red-500" onClick={() => setDealTypeFilters(dealTypeFilters.filter((_, i) => i !== idx))}><Trash2 className="w-4 h-4" /></Button>
           </div>
         ))}
       </div>
 
-      {/* Category Filter Toggles */}
+      {/* Category Toggles */}
       <div className="space-y-4">
-        <h3 className="text-lg font-bold">Category Visibility in Filters</h3>
+        <h3 className="text-lg font-bold">Category Visibility</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {catFilters.map(c => (
-            <label key={c.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${c.show_in_filter ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`} data-testid={`cat-filter-${c.id}`}>
+            <label key={c.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${c.show_in_filter ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
               <input type="checkbox" checked={c.show_in_filter} onChange={() => toggleCatFilter(c.id)} className="rounded" />
               <span className="font-semibold text-sm">{c.name}</span>
             </label>
@@ -1173,13 +1219,13 @@ function FilterSettingsTab({ categories, stores, onRefresh }) {
         </div>
       </div>
 
-      {/* Store Filter Toggles */}
+      {/* Store Toggles */}
       <div className="space-y-4">
-        <h3 className="text-lg font-bold">Store Visibility in Filters</h3>
-        {storeFilters.length === 0 && <p className="text-gray-400 text-sm">No stores added yet. Add stores from the Stores tab.</p>}
+        <h3 className="text-lg font-bold">Store Visibility</h3>
+        {storeFilters.length === 0 && <p className="text-gray-400 text-sm">No stores yet.</p>}
         <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
           {storeFilters.map(s => (
-            <label key={s.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${s.show_in_filter ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`} data-testid={`store-filter-${s.id}`}>
+            <label key={s.id} className={`flex items-center gap-3 p-3 rounded-xl border cursor-pointer transition-all ${s.show_in_filter ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
               <input type="checkbox" checked={s.show_in_filter} onChange={() => toggleStoreFilter(s.id)} className="rounded" />
               <span className="font-semibold text-sm">{s.name}</span>
             </label>
@@ -1190,6 +1236,34 @@ function FilterSettingsTab({ categories, stores, onRefresh }) {
   );
 }
 
+function FilterSection({ title, items, setItems, updateItem, fields, addLabel, minLabel = 'Min', maxLabel = 'Max' }) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-bold">{title}</h3>
+        <Button variant="outline" size="sm" onClick={() => setItems([...items, { label: '', min: 0, max: 0, is_active: true, display_order: items.length }])}>
+          <Plus className="w-4 h-4 mr-1" /> {addLabel}
+        </Button>
+      </div>
+      {items.length === 0 && <p className="text-gray-400 text-sm">None configured.</p>}
+      {items.map((b, idx) => (
+        <div key={idx} className="flex items-center gap-3 bg-gray-50 rounded-xl p-3 border">
+          <Input placeholder="Label" value={b.label} onChange={e => updateItem(setItems, idx, 'label', e.target.value)} className="flex-1" />
+          <Input type="number" placeholder={minLabel} value={b.min} onChange={e => updateItem(setItems, idx, 'min', e.target.value)} className="w-24" />
+          <span className="text-gray-400 font-bold">—</span>
+          <Input type="number" placeholder={maxLabel} value={b.max} onChange={e => updateItem(setItems, idx, 'max', e.target.value)} className="w-24" />
+          <Input type="number" placeholder="Order" value={b.display_order || 0} onChange={e => updateItem(setItems, idx, 'display_order', e.target.value)} className="w-20" />
+          <label className="flex items-center gap-1 text-xs font-bold cursor-pointer">
+            <input type="checkbox" checked={b.is_active !== false} onChange={e => updateItem(setItems, idx, 'is_active', e.target.checked)} />
+            On
+          </label>
+          <Button variant="ghost" size="sm" className="text-red-500" onClick={() => setItems(items.filter((_, i) => i !== idx))}><Trash2 className="w-4 h-4" /></Button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 
 function SlideForm({ item, onSuccess }) {
   const [loading, setLoading] = useState(false);
@@ -1197,6 +1271,11 @@ function SlideForm({ item, onSuccess }) {
   const [form, setForm] = useState({
     image_url: item?.image_url || '',
     redirect_url: item?.redirect_url || '',
+    title: item?.title || '',
+    subtitle: item?.subtitle || '',
+    btn_text: item?.btn_text || '',
+    btn_link: item?.btn_link || '',
+    bg_color: item?.bg_color || '#ee922c',
     is_active: item?.is_active ?? true,
     order: item?.order ?? 1
   });
@@ -1235,9 +1314,9 @@ function SlideForm({ item, onSuccess }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 pt-4" data-testid="slide-form">
+    <form onSubmit={handleSubmit} className="space-y-4 pt-4 max-h-[65vh] overflow-y-auto" data-testid="slide-form">
       <div>
-        <Label className="text-sm font-bold mb-2 block">Slide Image</Label>
+        <Label className="text-sm font-bold mb-2 block">Banner Image</Label>
         {preview && <img src={preview} alt="Preview" className="w-full aspect-[3/1] object-cover rounded-xl mb-2 border" />}
         <label className="flex items-center gap-2 border-2 border-dashed rounded-xl p-4 cursor-pointer hover:bg-gray-50 transition-colors">
           <ImagePlus className="w-5 h-5 text-gray-400" />
@@ -1245,11 +1324,21 @@ function SlideForm({ item, onSuccess }) {
           <input type="file" accept="image/*" className="hidden" onChange={handleFileUpload} disabled={uploading} />
         </label>
       </div>
-      <Input placeholder="Redirect URL (deal or affiliate link)" value={form.redirect_url} onChange={e => setForm({ ...form, redirect_url: e.target.value })} data-testid="slide-redirect-input" />
+      <Input placeholder="Title (overlay text)" value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} data-testid="slide-title-input" />
+      <Input placeholder="Subtitle" value={form.subtitle} onChange={e => setForm({ ...form, subtitle: e.target.value })} data-testid="slide-subtitle-input" />
+      <div className="grid grid-cols-2 gap-3">
+        <Input placeholder="Button Text" value={form.btn_text} onChange={e => setForm({ ...form, btn_text: e.target.value })} data-testid="slide-btn-text" />
+        <Input placeholder="Button Link" value={form.btn_link} onChange={e => setForm({ ...form, btn_link: e.target.value })} data-testid="slide-btn-link" />
+      </div>
+      <Input placeholder="Redirect URL (fallback)" value={form.redirect_url} onChange={e => setForm({ ...form, redirect_url: e.target.value })} data-testid="slide-redirect-input" />
       <div className="flex gap-4">
+        <div>
+          <Label className="text-sm font-bold mb-1 block">Bg Color</Label>
+          <input type="color" value={form.bg_color} onChange={e => setForm({ ...form, bg_color: e.target.value })} className="w-10 h-10 rounded-lg border cursor-pointer" />
+        </div>
         <div className="flex-1">
-          <Label className="text-sm font-bold mb-1 block">Order (1-5)</Label>
-          <Input type="number" min={1} max={5} value={form.order} onChange={e => setForm({ ...form, order: parseInt(e.target.value, 10) || 1 })} data-testid="slide-order-input" />
+          <Label className="text-sm font-bold mb-1 block">Order (1-10)</Label>
+          <Input type="number" min={1} max={10} value={form.order} onChange={e => setForm({ ...form, order: parseInt(e.target.value, 10) || 1 })} data-testid="slide-order-input" />
         </div>
         <div className="flex items-end gap-2 pb-1">
           <input type="checkbox" checked={form.is_active} onChange={e => setForm({ ...form, is_active: e.target.checked })} data-testid="slide-active-toggle" />
@@ -1438,3 +1527,79 @@ function HeroEditorTab() {
     </motion.div>
   );
 }
+
+function SiteSettingsTab() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [trendingConfig, setTrendingConfig] = useState({
+    trending_enabled: true,
+    trending_duration_hours: 24
+  });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const config = await getTrendingConfig();
+        setTrendingConfig(prev => ({ ...prev, ...config }));
+      } catch {}
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await updateTrendingConfig(trendingConfig);
+      toast.success('Settings saved');
+    } catch { toast.error('Failed to save'); }
+    finally { setSaving(false); }
+  };
+
+  if (loading) return <div className="flex items-center justify-center p-20"><Loader2 className="w-8 h-8 animate-spin text-gray-400" /></div>;
+
+  return (
+    <motion.div key="settings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-8 space-y-8" data-testid="site-settings-tab">
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-bold">Site Settings</h2>
+        <Button onClick={handleSave} disabled={saving} className="bg-[#ee922c]" data-testid="settings-save-btn">
+          {saving ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+          Save Settings
+        </Button>
+      </div>
+
+      <div className="bg-white border rounded-2xl p-6 space-y-5 max-w-lg">
+        <div className="flex items-center gap-3">
+          <Flame className="w-6 h-6 text-[#ee922c]" />
+          <h3 className="text-lg font-bold">Trending Deals</h3>
+        </div>
+
+        <label className="flex items-center gap-3 p-3 rounded-xl border cursor-pointer" data-testid="trending-toggle">
+          <input
+            type="checkbox"
+            checked={trendingConfig.trending_enabled}
+            onChange={e => setTrendingConfig({ ...trendingConfig, trending_enabled: e.target.checked })}
+            className="rounded"
+          />
+          <div>
+            <span className="font-bold text-sm">Trending Enabled</span>
+            <p className="text-xs text-gray-500">Show trending deals section on the site</p>
+          </div>
+        </label>
+
+        <div>
+          <Label className="text-sm font-bold mb-1 block">Trending Duration (hours)</Label>
+          <Input
+            type="number"
+            min={1}
+            max={168}
+            value={trendingConfig.trending_duration_hours}
+            onChange={e => setTrendingConfig({ ...trendingConfig, trending_duration_hours: parseInt(e.target.value, 10) || 24 })}
+            data-testid="trending-duration"
+          />
+          <p className="text-xs text-gray-400 mt-1">Only deals created within this window appear as trending. Default: 24 hours.</p>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+

@@ -81,6 +81,9 @@ export default function Header() {
             <Link to="/deals/limited-time" className="text-gray-600 hover:text-[#ee922c] font-medium transition-colors" data-testid="limited-link">
               Limited Time
             </Link>
+            <Link to="/stores" className="text-gray-600 hover:text-[#ee922c] font-medium transition-colors" data-testid="stores-link">
+              Stores
+            </Link>
             <Link to="/blog" className="text-gray-600 hover:text-[#ee922c] font-medium transition-colors" data-testid="blog-link">
               Blog
             </Link>
@@ -173,6 +176,13 @@ export default function Header() {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Limited Time
+              </Link>
+              <Link 
+                to="/stores" 
+                className="text-gray-600 hover:text-[#ee922c] font-medium py-2"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Stores
               </Link>
               <Link 
                 to="/blog" 
