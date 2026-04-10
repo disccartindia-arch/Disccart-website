@@ -25,11 +25,17 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
   - FilterDrawer: discount % filters, deal type filters
   - Admin: Site Settings tab (trending config), upgraded Filter Settings, upgraded Store form, upgraded Slide form
   - Header nav: Stores link added
+- Phase 18: UX Improvements (April 10, 2026)
+  - Load More Pagination: /api/coupons returns {deals, total, page, has_more}; HomePage shows "Load More Deals" button
+  - Scroll-to-Top Button: Floating button (vertically centered right side), appears after 300px scroll
+  - Coupon Page Filtering Fix: /api/coupons-only now only returns deals with non-null/non-empty code field
+  - Filter Refresh Bug Fix: DealsPage clears cached data, shows loading, handles race conditions via filterVersion ref
 
 ## Key API Endpoints
 - POST /api/auth/login, POST /api/auth/register, GET /api/auth/me
 - GET /api/categories, POST/PUT/DELETE /api/categories
-- GET /api/coupons, POST/PUT/DELETE /api/coupons, POST /api/coupons/bulk-delete
+- GET /api/coupons (paginated: returns {deals, total, page, has_more})
+- GET /api/coupons-only (code-only deals, array response)
 - POST /api/upload-image (Cloudinary)
 - GET /api/stores, GET /api/stores/featured, GET /api/stores/slug/{slug}, POST/PUT/DELETE /api/stores
 - GET /api/admin/filters, PATCH /api/admin/filters (price/discount/deal-type/category/store)

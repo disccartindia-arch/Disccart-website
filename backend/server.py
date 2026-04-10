@@ -326,13 +326,13 @@ async def get_coupons(
     if featured:
         query["is_featured"] = True
 
-    sort_field = {"created_at": -1}
+    sort_field = [("created_at", -1), ("_id", -1)]
     if sort_by == "popular":
-        sort_field = {"clicks": -1, "created_at": -1}
+        sort_field = [("clicks", -1), ("created_at", -1), ("_id", -1)]
 
     total = await db.coupons.count_documents(query)
     skip = (page - 1) * limit
-    coupons = await db.coupons.find(query).sort(list(sort_field.items())).skip(skip).limit(limit).to_list(limit)
+    coupons = await db.coupons.find(query).sort(sort_field).skip(skip).limit(limit).to_list(limit)
     for c in coupons:
         c["id"] = str(c.pop("_id"))
 
