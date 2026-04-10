@@ -38,6 +38,16 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
   - Independent section loading: HomePage sections (featured, trending, categories, limited, hero) load in parallel with own loading states
   - Skeleton Loading UI: DealCardSkeleton, StoreCardSkeleton, CouponCardSkeleton, CategoryCardSkeleton components
   - FilterDrawer preserved on HomePage
+- Phase 20: Better Stack Monitoring (April 10, 2026)
+  - Added /api/health endpoint (status, DB connectivity, cache entries, timestamp)
+  - 5 Better Stack monitors created:
+    - DISCCART API Health (ID: 4266513) — /api/health, every 3min
+    - DISCCART Coupons API (ID: 4266514) — /api/coupons, every 3min
+    - DISCCART Categories API (ID: 4266515) — /api/categories, every 5min
+    - DISCCART Stores API (ID: 4266516) — /api/stores, every 5min
+    - DISCCART Backend Uptime (ID: 4266517) — /api/coupons, every 1min
+  - Email alerts enabled for all monitors
+  - Note: /api/health monitor will activate after deploying latest code to Render
 
 ## Key API Endpoints
 - POST /api/auth/login, POST /api/auth/register, GET /api/auth/me

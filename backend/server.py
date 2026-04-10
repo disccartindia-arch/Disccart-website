@@ -119,6 +119,21 @@ app.add_middleware(
 
 api_router = APIRouter()
 
+# ===================== HEALTH CHECK =====================
+@api_router.get("/health")
+async def health_check():
+    try:
+        await db.command("ping")
+        db_status = "connected"
+    except Exception:
+        db_status = "disconnected"
+    return {
+        "status": "ok",
+        "database": db_status,
+        "cache_entries": len(cache._store),
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
 # ===================== CACHE HEADER MIDDLEWARE =====================
 PUBLIC_CACHE_PREFIXES = [
     "/api/coupons", "/api/categories", "/api/stores",
