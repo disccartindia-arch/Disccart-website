@@ -61,7 +61,7 @@ export const uploadImage = async (file) => {
 // ===================== COUPONS =====================
 export const getCoupons = async (params = {}) => {
   const { data } = await api.get('/coupons', { params });
-  return Array.isArray(data) ? data : [];
+  return data;
 };
 
 export const getCoupon = async (id) => {

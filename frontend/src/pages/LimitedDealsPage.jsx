@@ -13,7 +13,8 @@ export default function LimitedDealsPage() {
     const fetchDeals = async () => {
       try {
         const data = await getCoupons({ limit: 50 });
-        const limited = Array.isArray(data) ? data.filter(d => (d.offer_type || '').includes('limited')) : [];
+        const allDeals = data?.deals || (Array.isArray(data) ? data : []);
+        const limited = allDeals.filter(d => (d.offer_type || '').includes('limited'));
         setDeals(limited);
       } catch (error) {
         console.error('Failed to fetch deals:', error);

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { Clock, Zap, Tag, Timer } from 'lucide-react';
+import { Clock, Zap, Tag, Package } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getCoupons, getFilteredDeals } from '../lib/api';
 import DealCard from '../components/DealCard';
@@ -11,23 +11,30 @@ export default function DealsPage() {
   const [deals, setDeals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeFilters, setActiveFilters] = useState({});
+  const filterVersion = useRef(0);
 
   const fetchDeals = async (filters = {}) => {
+    const version = ++filterVersion.current;
     setLoading(true);
+    setDeals([]);
     try {
       const hasFilters = Object.keys(filters).length > 0;
+      let result;
       if (hasFilters) {
-        const result = await getFilteredDeals(filters);
+        result = await getFilteredDeals({ ...filters, skip: 0, limit: 50 });
+        if (version !== filterVersion.current) return;
         setDeals(Array.isArray(result.deals) ? result.deals : []);
       } else {
-        const data = await getCoupons({ limit: 50 });
-        setDeals(Array.isArray(data) ? data : []);
+        const data = await getCoupons({ limit: 50, page: 1 });
+        if (version !== filterVersion.current) return;
+        const items = data?.deals || (Array.isArray(data) ? data : []);
+        setDeals(items);
       }
     } catch (error) {
       console.error('Failed to fetch deals:', error);
-      setDeals([]);
+      if (version === filterVersion.current) setDeals([]);
     } finally {
-      setLoading(false);
+      if (version === filterVersion.current) setLoading(false);
     }
   };
 
@@ -36,19 +43,20 @@ export default function DealsPage() {
   }, [activeFilters]);
 
   const handleFilterApply = (filters) => {
-    setActiveFilters(filters);
+    setActiveFilters({ ...filters });
   };
+
+  const activeFilterCount = Object.keys(activeFilters).length;
 
   return (
     <div className="pb-20 md:pb-8" data-testid="deals-page">
-      <SEO 
+      <SEO
         title="All Deals - Best Coupons & Offers"
         description="Browse all active deals, coupons, and offers from top brands. Find verified discounts updated daily."
         keywords="all deals, coupons, offers, discounts, promo codes"
         url="/deals"
       />
 
-      {/* Hero */}
       <section className="bg-gradient-to-br from-orange-50 to-green-50 py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div
@@ -60,13 +68,12 @@ export default function DealsPage() {
               All Deals & Offers
             </h1>
             <p className="text-gray-600 text-lg">
-              {deals.length}+ verified deals from top brands
+              {loading ? 'Loading deals...' : `${deals.length} verified deals from top brands`}
             </p>
           </motion.div>
         </div>
       </section>
 
-      {/* Quick Filters */}
       <section className="py-6 border-b border-gray-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex gap-3 overflow-x-auto hide-scrollbar">
@@ -91,11 +98,19 @@ export default function DealsPage() {
               <Zap className="w-4 h-4" />
               Trending
             </Link>
+            {activeFilterCount > 0 && (
+              <button
+                onClick={() => setActiveFilters({})}
+                className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 text-red-600 rounded-full font-medium text-sm hover:bg-red-100"
+                data-testid="clear-filters-btn"
+              >
+                Clear Filters ({activeFilterCount})
+              </button>
+            )}
           </div>
         </div>
       </section>
 
-      {/* Deals Grid */}
       <section className="py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {loading ? (
@@ -104,7 +119,7 @@ export default function DealsPage() {
                 <div key={i} className="bg-gray-200 rounded-2xl h-80 animate-pulse" />
               ))}
             </div>
-          ) : (
+          ) : deals.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {deals.map((deal, index) => (
                 <motion.div
@@ -116,6 +131,21 @@ export default function DealsPage() {
                   <DealCard deal={deal} />
                 </motion.div>
               ))}
+            </div>
+          ) : (
+            <div className="text-center py-16" data-testid="no-deals-found">
+              <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500 text-lg font-semibold">No deals found</p>
+              <p className="text-gray-400 mt-1 text-sm">Try adjusting your filters or check back later</p>
+              {activeFilterCount > 0 && (
+                <button
+                  onClick={() => setActiveFilters({})}
+                  className="mt-4 px-6 py-2 bg-[#ee922c] text-white rounded-xl font-medium text-sm hover:bg-[#d9811f] transition-colors"
+                  data-testid="reset-filters-btn"
+                >
+                  Reset Filters
+                </button>
+              )}
             </div>
           )}
         </div>

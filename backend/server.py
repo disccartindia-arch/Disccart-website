@@ -293,23 +293,89 @@ async def delete_cat(cat_id: str):
 # ===================== COUPONS / DEALS =====================
 
 @api_router.get("/coupons")
-@api_router.get("/coupons-only")
-async def get_coupons(category: Optional[str] = None, offer_type: Optional[str] = None, isAdmin: bool = False):
+async def get_coupons(
+    category: Optional[str] = None,
+    offer_type: Optional[str] = None,
+    isAdmin: bool = False,
+    page: int = 1,
+    limit: int = 50,
+    search: Optional[str] = None,
+    sort_by: Optional[str] = None,
+    featured: Optional[bool] = None
+):
     query = {}
     if not isAdmin:
         query["is_active"] = True
 
     if category and category not in ["All", "undefined", "null"]:
-        # First try to find category by slug to get the real name
         cat_doc = await db.categories.find_one({"slug": category})
         cat_name = cat_doc["name"] if cat_doc else category
-        # Use regex to match within comma-separated category_name field
         query["category_name"] = {"$regex": cat_name, "$options": "i"}
 
     if offer_type and offer_type not in ["undefined", "null"]:
         query["offer_type"] = {"$regex": offer_type, "$options": "i"}
 
-    coupons = await db.coupons.find(query).sort("created_at", -1).to_list(1000)
+    if search and search.strip():
+        search_regex = {"$regex": search.strip(), "$options": "i"}
+        query["$or"] = [
+            {"title": search_regex},
+            {"brand_name": search_regex},
+            {"description": search_regex}
+        ]
+
+    if featured:
+        query["is_featured"] = True
+
+    sort_field = {"created_at": -1}
+    if sort_by == "popular":
+        sort_field = {"clicks": -1, "created_at": -1}
+
+    total = await db.coupons.count_documents(query)
+    skip = (page - 1) * limit
+    coupons = await db.coupons.find(query).sort(list(sort_field.items())).skip(skip).limit(limit).to_list(limit)
+    for c in coupons:
+        c["id"] = str(c.pop("_id"))
+
+    return {
+        "deals": coupons,
+        "total": total,
+        "page": page,
+        "has_more": (skip + limit) < total
+    }
+
+
+@api_router.get("/coupons-only")
+async def get_coupons_only(
+    category: Optional[str] = None,
+    search: Optional[str] = None,
+    sort_by: Optional[str] = "popular",
+    limit: int = 50,
+    page: int = 1
+):
+    query = {
+        "is_active": True,
+        "code": {"$ne": None, "$nin": [None, ""]}
+    }
+
+    if category and category not in ["All", "undefined", "null"]:
+        cat_doc = await db.categories.find_one({"slug": category})
+        cat_name = cat_doc["name"] if cat_doc else category
+        query["category_name"] = {"$regex": cat_name, "$options": "i"}
+
+    if search and search.strip():
+        search_regex = {"$regex": search.strip(), "$options": "i"}
+        query["$or"] = [
+            {"title": search_regex},
+            {"brand_name": search_regex},
+            {"code": search_regex}
+        ]
+
+    sort_field = {"created_at": -1}
+    if sort_by == "popular":
+        sort_field = {"clicks": -1, "created_at": -1}
+
+    skip = (page - 1) * limit
+    coupons = await db.coupons.find(query).sort(list(sort_field.items())).skip(skip).limit(limit).to_list(limit)
     for c in coupons:
         c["id"] = str(c.pop("_id"))
     return coupons

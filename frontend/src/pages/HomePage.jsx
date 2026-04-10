@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { TrendingUp, Zap, ArrowRight, Tag, Clock } from 'lucide-react';
+import { TrendingUp, Zap, ArrowRight, Tag, Clock, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getCoupons, getCategories, getHeroConfig } from '../lib/api';
 import DealCard from '../components/DealCard';
@@ -9,6 +9,8 @@ import FilterDrawer from '../components/FilterDrawer';
 import HeroSlider from '../components/HeroSlider';
 import { HomeSEO } from '../components/SEO';
 
+const DEALS_PER_PAGE = 12;
+
 export default function HomePage() {
   const [featuredDeals, setFeaturedDeals] = useState([]);
   const [trendingDeals, setTrendingDeals] = useState([]);
@@ -16,22 +18,34 @@ export default function HomePage() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [hero, setHero] = useState(null);
+  const [trendingPage, setTrendingPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [featured, all, cats, limited, heroData] = await Promise.all([
-          getCoupons({ featured: true, limit: 4 }),
-          getCoupons({ limit: 12 }),
+        const [featured, allData, cats, limited, heroData] = await Promise.all([
+          getCoupons({ featured: true, limit: 4, page: 1 }),
+          getCoupons({ limit: DEALS_PER_PAGE, page: 1 }),
           getCategories(),
-          getCoupons({ offer_type: 'limited', limit: 6 }),
+          getCoupons({ offer_type: 'limited', limit: 6, page: 1 }),
           getHeroConfig().catch(() => null)
         ]);
-        setFeaturedDeals(Array.isArray(featured) ? featured : []);
-        setTrendingDeals(Array.isArray(all) ? all : []);
+
+        const featuredItems = allData?.deals || (Array.isArray(featured) ? featured : []);
+        setFeaturedDeals(Array.isArray(featured?.deals) ? featured.deals : (Array.isArray(featured) ? featured : []));
+
+        const trendingItems = allData?.deals || (Array.isArray(allData) ? allData : []);
+        setTrendingDeals(trendingItems);
+        setHasMore(allData?.has_more || false);
+
         setCategories(Array.isArray(cats) ? cats : []);
-        const limitedResults = Array.isArray(limited) ? limited.filter(d => (d.offer_type || '').includes('limited')) : [];
+
+        const limitedItems = limited?.deals || (Array.isArray(limited) ? limited : []);
+        const limitedResults = limitedItems.filter(d => (d.offer_type || '').includes('limited'));
         setLimitedDeals(limitedResults);
+
         if (heroData) setHero(heroData);
       } catch (error) {
         console.error('Failed to fetch data:', error);
@@ -45,6 +59,22 @@ export default function HomePage() {
     };
     fetchData();
   }, []);
+
+  const loadMore = async () => {
+    setLoadingMore(true);
+    try {
+      const nextPage = trendingPage + 1;
+      const data = await getCoupons({ limit: DEALS_PER_PAGE, page: nextPage });
+      const newDeals = data?.deals || (Array.isArray(data) ? data : []);
+      setTrendingDeals(prev => [...prev, ...newDeals]);
+      setTrendingPage(nextPage);
+      setHasMore(data?.has_more || false);
+    } catch (error) {
+      console.error('Failed to load more:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const categoryImages = {
     'Electronics': 'https://images.unsplash.com/photo-1595284842888-519573d8fb7b?w=400',
@@ -60,7 +90,6 @@ export default function HomePage() {
       <HomeSEO />
       {/* Hero Section */}
       <section className="relative overflow-hidden py-8 md:py-12" style={{ background: hero?.bg_gradient || 'linear-gradient(135deg, #FFF8F0 0%, #F0F9F0 40%, #E8F5E9 65%, #FFF3E0 100%)' }}>
-        {/* Floating decorative elements */}
         {(hero?.show_floating_icons !== false) && (
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <div className="absolute -top-10 -left-10 w-60 h-60 rounded-full bg-green-200/20 blur-3xl hero-float-slow" />
@@ -204,7 +233,7 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* Trending Deals */}
+      {/* Trending Deals with Load More */}
       <section className="py-8" data-testid="trending-section">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-6">
@@ -226,6 +255,27 @@ export default function HomePage() {
                 ))
             }
           </div>
+
+          {/* Load More Button */}
+          {!loading && hasMore && (
+            <div className="flex justify-center mt-8" data-testid="load-more-container">
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="px-8 py-3 bg-gray-900 text-white font-bold rounded-xl hover:bg-gray-800 active:scale-95 transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                data-testid="load-more-btn"
+              >
+                {loadingMore ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Loading...
+                  </>
+                ) : (
+                  'Load More Deals'
+                )}
+              </button>
+            </div>
+          )}
         </div>
       </section>
 

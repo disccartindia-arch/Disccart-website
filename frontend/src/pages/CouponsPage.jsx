@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Search, Ticket, Copy, Check, ExternalLink, Clock, Filter, TrendingUp, Sparkles } from 'lucide-react';
+import { Search, Ticket, Copy, Check, ExternalLink, Clock, TrendingUp, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getCouponsOnly, getCategories } from '../lib/api';
 import { DealScoreBadge, VerificationBadge } from '../components/DealCard';
@@ -30,39 +30,6 @@ function CouponCard({ coupon }) {
     }
   };
 
-  // Inside your CouponCard component
-const CouponCard = ({ coupon }) => {
-  return (
-    <div className="deal-card">
-      {/* ... other code ... */}
-      
-      <div className="price-container">
-        {/* Only show the price section if prices exist */}
-        {coupon.discounted_price && (
-          <div className="flex items-center gap-2">
-            <span className="text-xl font-bold text-green-600">
-              ₹{coupon.discounted_price}
-            </span>
-            {coupon.original_price && (
-              <span className="text-sm text-gray-400 line-through">
-                ₹{coupon.original_price}
-              </span>
-            )}
-            {/* Optional: Show % off badge */}
-            {coupon.original_price && (
-              <span className="text-xs font-medium text-red-500">
-                ({Math.round(((coupon.original_price - coupon.discounted_price) / coupon.original_price) * 100)}% OFF)
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* ... rest of card ... */}
-    </div>
-  );
-};
-
   const getDiscountDisplay = () => {
     if (coupon.discount_type === 'percentage' && coupon.discount_value) return `${coupon.discount_value}% OFF`;
     if (coupon.discount_type === 'flat' && coupon.discount_value) return `₹${coupon.discount_value} OFF`;
@@ -90,7 +57,6 @@ const CouponCard = ({ coupon }) => {
         className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden"
         data-testid={`coupon-card-${coupon.id}`}
       >
-        {/* Top section */}
         <div className="p-5">
           <div className="flex items-start justify-between mb-3">
             <div className="flex-1">
@@ -112,7 +78,21 @@ const CouponCard = ({ coupon }) => {
             <p className="text-sm text-gray-500 line-clamp-2 mb-3">{coupon.description}</p>
           )}
 
-          {/* Score + Verification + Expiry */}
+          {/* Price display */}
+          {coupon.discounted_price > 0 && (
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-lg font-bold text-green-600">₹{coupon.discounted_price}</span>
+              {coupon.original_price > 0 && (
+                <>
+                  <span className="text-sm text-gray-400 line-through">₹{coupon.original_price}</span>
+                  <span className="text-xs font-medium text-red-500">
+                    ({Math.round(((coupon.original_price - coupon.discounted_price) / coupon.original_price) * 100)}% OFF)
+                  </span>
+                </>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center gap-3 flex-wrap">
             <DealScoreBadge score={coupon.deal_score} />
             <VerificationBadge status={coupon.verification_status || (coupon.is_verified ? 'verified' : 'unverified')} />
@@ -125,7 +105,6 @@ const CouponCard = ({ coupon }) => {
           </div>
         </div>
 
-        {/* Coupon Code section */}
         <div className="border-t border-dashed border-gray-200 px-5 py-4 bg-gray-50/50">
           <div className="flex items-center gap-3">
             <div className="flex-1 relative">
@@ -211,7 +190,6 @@ export default function CouponsPage() {
         url="/coupons"
       />
 
-      {/* Hero */}
       <section className="bg-gradient-to-br from-orange-50 via-white to-green-50 py-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center">
@@ -229,11 +207,9 @@ export default function CouponsPage() {
         </div>
       </section>
 
-      {/* Filters */}
       <section className="py-6 border-b border-gray-100 sticky top-16 md:top-20 bg-white/90 backdrop-blur-xl z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center">
-            {/* Search */}
             <form onSubmit={handleSearch} className="flex-1 max-w-md">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
@@ -248,7 +224,6 @@ export default function CouponsPage() {
               </div>
             </form>
 
-            {/* Category Filter */}
             <div className="flex gap-2 overflow-x-auto hide-scrollbar">
               <button
                 onClick={() => setSelectedCategory('')}
@@ -273,7 +248,6 @@ export default function CouponsPage() {
               ))}
             </div>
 
-            {/* Sort */}
             <div className="flex gap-2 flex-shrink-0">
               <button
                 onClick={() => setSortBy('popular')}
@@ -298,7 +272,6 @@ export default function CouponsPage() {
         </div>
       </section>
 
-      {/* Coupons Grid */}
       <section className="py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between mb-6">

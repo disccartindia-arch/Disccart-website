@@ -16,7 +16,8 @@ export default function CategoryPage() {
       setLoading(true);
       try {
         const data = await getCoupons({ category: slug });
-        setDeals(Array.isArray(data) ? data : []);
+        const items = data?.deals || (Array.isArray(data) ? data : []);
+        setDeals(items);
       } catch (error) {
         console.error('Failed to fetch filtered deals:', error);
         setDeals([]);

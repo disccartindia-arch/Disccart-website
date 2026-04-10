@@ -17,7 +17,8 @@ export default function SearchPage() {
       setLoading(true);
       try {
         const data = await getCoupons({ search: query });
-        setDeals(Array.isArray(data) ? data : []);
+        const items = data?.deals || (Array.isArray(data) ? data : []);
+        setDeals(items);
       } catch (error) {
         console.error('Failed to fetch deals:', error);
         setDeals([]);

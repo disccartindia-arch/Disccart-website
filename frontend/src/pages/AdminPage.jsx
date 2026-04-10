@@ -79,7 +79,7 @@ export default function AdminPage() {
     setLoading(true);
     try {
       const [couponsData, analyticsData, categoriesData, linksData, pagesData, blogData, storesData, slidesData] = await Promise.all([
-        getCoupons({ limit: 100 }),
+        getCoupons({ limit: 100, isAdmin: true }),
         getAnalyticsOverview().catch(() => null),
         getCategories().catch(() => []),
         getPrettyLinks().catch(() => []),
@@ -88,7 +88,7 @@ export default function AdminPage() {
         getStores().catch(() => []),
         getAdminSlides().catch(() => [])
       ]);
-      setCoupons(Array.isArray(couponsData) ? couponsData : []);
+      setCoupons(Array.isArray(couponsData?.deals) ? couponsData.deals : (Array.isArray(couponsData) ? couponsData : []));
       setAnalytics(analyticsData);
       setCategories(Array.isArray(categoriesData) ? categoriesData : []);
       setPrettyLinks(Array.isArray(linksData) ? linksData : []);

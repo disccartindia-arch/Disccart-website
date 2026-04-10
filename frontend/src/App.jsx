@@ -39,6 +39,7 @@ import LimitedDealsPage from "./pages/LimitedDealsPage";
 import WishlistPage from "./pages/WishlistPage";
 import StoresPage from "./pages/StoresPage";
 import StoreDetailPage from "./pages/StoreDetailPage";
+import ScrollToTop from "./components/ScrollToTop";
 
 function AdminRoute() {
   const { user, loading, isAdmin } = useAuth();
@@ -80,6 +81,7 @@ function App() {
             </main>
             <Footer />
             <BottomNav />
+            <ScrollToTop />
             <Toaster position="top-center" richColors />
           </div>
         </AnalyticsProvider>
