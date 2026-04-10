@@ -48,6 +48,14 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
     - DISCCART Backend Uptime (ID: 4266517) — /api/coupons, every 1min
   - Email alerts enabled for all monitors
   - Note: /api/health monitor will activate after deploying latest code to Render
+- Phase 21: Popup System & Intro Animation (April 10, 2026)
+  - IntroAnimation: 2-3s cart logo animation (fly in → items drop → bounce → fly out), sessionStorage-based (once per visit)
+  - Smart PopupManager: 7 popup types (entry, exit_intent, scroll, click, timed, offer, newsletter)
+  - 5 trigger types: on_load, on_scroll, exit_intent, time_delay, click
+  - 5 animation styles: slide_up, slide_down, fade, scale, bounce
+  - Smart display logic: sessionStorage/localStorage frequency control, device/page targeting, date scheduling
+  - Backend: Full popup CRUD + analytics (views, clicks) tracking
+  - Admin Popups tab: create/edit/delete/toggle/preview with targeting, scheduling, media upload, analytics display
 
 ## Key API Endpoints
 - POST /api/auth/login, POST /api/auth/register, GET /api/auth/me
@@ -62,6 +70,8 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
 - GET/PATCH /api/admin/trending-config
 - GET /api/slides, GET/POST/PATCH/DELETE /api/admin/slides
 - GET /api/hero-config, PATCH /api/admin/hero-config
+- GET /api/popups, GET /api/popups/active, POST/PUT/DELETE /api/admin/popups/{id}
+- POST /api/popups/{id}/view, POST /api/popups/{id}/click
 - CRUD: /api/pretty-links, /api/pages, /api/blog
 - Wishlist: GET/POST/DELETE /api/wishlist/{user_id}
 
@@ -74,6 +84,7 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
 - `site_settings`: {_id: "hero"|"trending", ...config}
 - `users`: {email, password_hash, role (admin|user)}
 - `wishlists`, `clicks`, `pretty_links`, `pages`, `blog_posts`
+- `popups`: {title, description, cta_text, cta_link, image_url, video_url, popup_type, trigger, scroll_percent, delay_seconds, target_pages[], target_devices[], animation_style, is_active, frequency, start_date, end_date, priority, views, clicks}
 
 ## Backlog
 - P1: Facebook Pixel tracking
