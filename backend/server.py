@@ -1193,6 +1193,104 @@ async def update_hero_config(request: Request):
     cache.invalidate("hero")
     return {"status": "updated"}
 
+# ===================== POPUPS =====================
+
+class PopupCreate(BaseModel):
+    title: str = ""
+    description: str = ""
+    cta_text: str = ""
+    cta_link: str = ""
+    image_url: str = ""
+    video_url: str = ""
+    popup_type: str = "entry"  # entry, exit_intent, scroll, click, timed, offer, newsletter
+    trigger: str = "on_load"  # on_load, on_scroll, exit_intent, time_delay, click
+    scroll_percent: int = 50
+    delay_seconds: int = 5
+    target_pages: list = []  # [], ["home","coupons","deals","blog","stores"]
+    target_devices: list = []  # [], ["mobile","desktop","tablet"]
+    animation_style: str = "slide_up"  # slide_up, slide_down, fade, scale, bounce
+    is_active: bool = True
+    frequency: str = "once_per_session"  # once_per_session, once_per_day, always
+    start_date: Optional[str] = None
+    end_date: Optional[str] = None
+    priority: int = 0
+
+@api_router.get("/popups")
+async def get_popups():
+    cached = cache.get("popups_all")
+    if cached is not None:
+        return cached
+    popups = await db.popups.find().sort("priority", -1).to_list(100)
+    for p in popups:
+        p["id"] = str(p.pop("_id"))
+    cache.set("popups_all", popups, CACHE_DEALS)
+    return popups
+
+@api_router.get("/popups/active")
+async def get_active_popups():
+    cached = cache.get("popups_active")
+    if cached is not None:
+        return cached
+    now = datetime.now(timezone.utc).isoformat()
+    query = {"is_active": True}
+    popups = await db.popups.find(query).sort("priority", -1).to_list(50)
+    result = []
+    for p in popups:
+        sd = p.get("start_date")
+        ed = p.get("end_date")
+        if sd and sd > now:
+            continue
+        if ed and ed < now:
+            continue
+        p["id"] = str(p.pop("_id"))
+        result.append(p)
+    cache.set("popups_active", result, 60)
+    return result
+
+@api_router.post("/admin/popups")
+async def create_popup(request: Request):
+    await admin_required(request)
+    data = await request.json()
+    data["created_at"] = datetime.now(timezone.utc).isoformat()
+    data["views"] = 0
+    data["clicks"] = 0
+    result = await db.popups.insert_one(data)
+    cache.invalidate("popups")
+    return {"id": str(result.inserted_id), "status": "created"}
+
+@api_router.put("/admin/popups/{popup_id}")
+async def update_popup(popup_id: str, request: Request):
+    await admin_required(request)
+    data = await request.json()
+    data.pop("_id", None)
+    data.pop("id", None)
+    await db.popups.update_one({"_id": ObjectId(popup_id)}, {"$set": data})
+    cache.invalidate("popups")
+    return {"status": "updated"}
+
+@api_router.delete("/admin/popups/{popup_id}")
+async def delete_popup(popup_id: str, request: Request):
+    await admin_required(request)
+    await db.popups.delete_one({"_id": ObjectId(popup_id)})
+    cache.invalidate("popups")
+    return {"status": "deleted"}
+
+@api_router.post("/popups/{popup_id}/view")
+async def track_popup_view(popup_id: str):
+    try:
+        await db.popups.update_one({"_id": ObjectId(popup_id)}, {"$inc": {"views": 1}})
+    except Exception:
+        pass
+    return {"status": "ok"}
+
+@api_router.post("/popups/{popup_id}/click")
+async def track_popup_click(popup_id: str):
+    try:
+        await db.popups.update_one({"_id": ObjectId(popup_id)}, {"$inc": {"clicks": 1}})
+    except Exception:
+        pass
+    return {"status": "ok"}
+
 # ===================== APP CONFIG =====================
 
 app.include_router(api_router, prefix="/api")

@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Tag, Upload, Link2, FileText, BookOpen,
   Plus, Pencil, Trash2, X, Loader2, FileSpreadsheet,
   ExternalLink, ImagePlus, Search, Globe, Eye, EyeOff,
-  Store, SlidersHorizontal, Image, Palette, Flame, Settings
+  Store, SlidersHorizontal, Image, Palette, Flame, Settings, Megaphone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -34,6 +34,7 @@ import {
   getTrendingConfig, updateTrendingConfig
 } from '../lib/api';
 import { AdminSEO } from '../components/SEO';
+import AdminPopups from '../components/AdminPopups';
 
 export default function AdminPage() {
   const { isAuthenticated, isAdmin, loading: authLoading } = useAuth();
@@ -229,6 +230,7 @@ export default function AdminPage() {
     { id: 'links', label: 'Pretty Links', icon: Link2 },
     { id: 'pages', label: 'Pages', icon: FileText },
     { id: 'blog', label: 'Blog Posts', icon: BookOpen },
+    { id: 'popups', label: 'Popups', icon: Megaphone },
   ];
 
   return (
@@ -614,6 +616,8 @@ export default function AdminPage() {
                 </Table>
               </motion.div>
             )}
+
+            {activeTab === 'popups' && <AdminPopups />}
 
           </AnimatePresence>
         </div>

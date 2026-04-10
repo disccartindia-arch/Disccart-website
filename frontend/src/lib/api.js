@@ -163,10 +163,6 @@ export const generateAIContent = async (contentData) => {
 };
 
 // ===================== ADDITIONAL FEATURES =====================
-export const getCouponsOnly = async (params = {}) => {
-  const { data } = await api.get('/coupons-only', { params });
-  return Array.isArray(data) ? data : [];
-};
 
 export const getPrettyLinks = async () => {
   const { data } = await api.get('/pretty-links');
@@ -358,6 +354,45 @@ export const getHeroConfig = async () => {
 export const updateHeroConfig = async (configData) => {
   const { data } = await api.patch('/admin/hero-config', configData);
   return data;
+};
+
+// ===================== POPUPS =====================
+export const getActivePopups = async () => {
+  const { data } = await api.get('/popups/active');
+  return Array.isArray(data) ? data : [];
+};
+
+export const getAllPopups = async () => {
+  const { data } = await api.get('/popups');
+  return Array.isArray(data) ? data : [];
+};
+
+export const createPopup = async (popupData) => {
+  const { data } = await api.post('/admin/popups', popupData);
+  return data;
+};
+
+export const updatePopup = async (id, popupData) => {
+  const { data } = await api.put(`/admin/popups/${id}`, popupData);
+  return data;
+};
+
+export const deletePopup = async (id) => {
+  const { data } = await api.delete(`/admin/popups/${id}`);
+  return data;
+};
+
+export const trackPopupView = async (id) => {
+  try { await api.post(`/popups/${id}/view`); } catch {}
+};
+
+export const trackPopupClick = async (id) => {
+  try { await api.post(`/popups/${id}/click`); } catch {}
+};
+
+export const getCouponsOnly = async (params = {}) => {
+  const { data } = await api.get('/coupons-only', { params });
+  return Array.isArray(data) ? data : [];
 };
 
 export default api;

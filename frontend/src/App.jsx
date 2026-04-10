@@ -12,6 +12,7 @@ import '@fontsource/manrope/800.css';
 
 import "@/App.css";
 import "@/index.css";
+import { useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { Toaster } from "./components/ui/sonner";
@@ -40,6 +41,8 @@ import WishlistPage from "./pages/WishlistPage";
 import StoresPage from "./pages/StoresPage";
 import StoreDetailPage from "./pages/StoreDetailPage";
 import ScrollToTop from "./components/ScrollToTop";
+import IntroAnimation from "./components/IntroAnimation";
+import PopupManager from "./components/PopupManager";
 
 function AdminRoute() {
   const { user, loading, isAdmin } = useAuth();
@@ -49,10 +52,13 @@ function AdminRoute() {
 }
 
 function App() {
+  const [introComplete, setIntroComplete] = useState(false);
+
   return (
     <AuthProvider>
       <BrowserRouter>
         <AnalyticsProvider>
+          <IntroAnimation onComplete={() => setIntroComplete(true)} />
           <div className="App min-h-screen bg-[#FAFAFA]">
             <Header />
             <main>
@@ -82,6 +88,7 @@ function App() {
             <Footer />
             <BottomNav />
             <ScrollToTop />
+            <PopupManager />
             <Toaster position="top-center" richColors />
           </div>
         </AnalyticsProvider>
