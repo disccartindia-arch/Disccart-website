@@ -56,6 +56,15 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
   - Smart display logic: sessionStorage/localStorage frequency control, device/page targeting, date scheduling
   - Backend: Full popup CRUD + analytics (views, clicks) tracking
   - Admin Popups tab: create/edit/delete/toggle/preview with targeting, scheduling, media upload, analytics display
+- Phase 22: Mobile UX Fixes + Like/Comment System (April 21, 2026)
+  - Admin Panel: Tabs reorganized in 2-column grid (grid-cols-2 sm:grid-cols-3 md:flex) for proper mobile layout
+  - FilterDrawer: Apply button sticky above bottom nav (pb-24 on mobile), navigates to /deals after applying filters
+  - Verification Badge: Added verification_status dropdown (verified/unverified/expired) + deal_score input to admin deal edit form
+  - Like System: Anyone can like deals (visitor ID from localStorage for non-logged users, user ID for logged-in). Toggle like via POST /api/deals/{id}/like
+  - Comment System: Only logged-in users can comment. POST /api/deals/{id}/comments. Max 500 chars.
+  - DealDetailModal: Full deal detail popup with image, pricing, code, verification, like button, comments section
+  - Deal cards show like count + comment count at bottom, clicking opens DealDetailModal
+  - Bug fix: /api/auth/me now returns user id for comment system
 
 ## Key API Endpoints
 - POST /api/auth/login, POST /api/auth/register, GET /api/auth/me
@@ -72,6 +81,8 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
 - GET /api/hero-config, PATCH /api/admin/hero-config
 - GET /api/popups, GET /api/popups/active, POST/PUT/DELETE /api/admin/popups/{id}
 - POST /api/popups/{id}/view, POST /api/popups/{id}/click
+- POST /api/deals/{id}/like, GET /api/deals/{id}/likes
+- POST /api/deals/{id}/comments, GET /api/deals/{id}/comments
 - CRUD: /api/pretty-links, /api/pages, /api/blog
 - Wishlist: GET/POST/DELETE /api/wishlist/{user_id}
 
@@ -85,6 +96,8 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
 - `users`: {email, password_hash, role (admin|user)}
 - `wishlists`, `clicks`, `pretty_links`, `pages`, `blog_posts`
 - `popups`: {title, description, cta_text, cta_link, image_url, video_url, popup_type, trigger, scroll_percent, delay_seconds, target_pages[], target_devices[], animation_style, is_active, frequency, start_date, end_date, priority, views, clicks}
+- `likes`: {deal_id, user_id, created_at}
+- `comments`: {deal_id, user_id, user_name, text, created_at}
 
 ## Backlog
 - P1: Facebook Pixel tracking
