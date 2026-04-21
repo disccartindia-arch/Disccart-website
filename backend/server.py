@@ -257,7 +257,7 @@ async def admin_required(request: Request):
 @api_router.get("/auth/me")
 async def get_me(request: Request):
     user = await get_current_user(request)
-    return {"email": user["email"], "role": user.get("role", "user")}
+    return {"id": user.get("user_id"), "email": user["email"], "role": user.get("role", "user")}
 
 @api_router.post("/auth/login")
 async def login(data: UserLogin):
@@ -1290,6 +1290,69 @@ async def track_popup_click(popup_id: str):
     except Exception:
         pass
     return {"status": "ok"}
+
+# ===================== LIKES & COMMENTS =====================
+
+@api_router.post("/deals/{deal_id}/like")
+async def toggle_like(deal_id: str, request: Request):
+    body = await request.json()
+    user_id = body.get("user_id", "")
+    if not user_id:
+        raise HTTPException(400, "user_id required")
+    existing = await db.likes.find_one({"deal_id": deal_id, "user_id": user_id})
+    if existing:
+        await db.likes.delete_one({"_id": existing["_id"]})
+        count = await db.likes.count_documents({"deal_id": deal_id})
+        return {"liked": False, "count": count}
+    else:
+        await db.likes.insert_one({
+            "deal_id": deal_id,
+            "user_id": user_id,
+            "created_at": datetime.now(timezone.utc).isoformat()
+        })
+        count = await db.likes.count_documents({"deal_id": deal_id})
+        return {"liked": True, "count": count}
+
+@api_router.get("/deals/{deal_id}/likes")
+async def get_likes(deal_id: str, user_id: Optional[str] = None):
+    count = await db.likes.count_documents({"deal_id": deal_id})
+    liked = False
+    if user_id:
+        liked = await db.likes.find_one({"deal_id": deal_id, "user_id": user_id}) is not None
+    return {"count": count, "liked": liked}
+
+@api_router.post("/deals/{deal_id}/comments")
+async def add_comment(deal_id: str, request: Request):
+    body = await request.json()
+    user_id = body.get("user_id", "")
+    user_name = body.get("user_name", "User")
+    text = body.get("text", "").strip()
+    if not user_id or not text:
+        raise HTTPException(400, "user_id and text required")
+    doc = {
+        "deal_id": deal_id,
+        "user_id": user_id,
+        "user_name": user_name,
+        "text": text[:500],
+        "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    result = await db.comments.insert_one(doc)
+    doc.pop("_id", None)
+    doc["id"] = str(result.inserted_id)
+    return doc
+
+@api_router.get("/deals/{deal_id}/comments")
+async def get_comments(deal_id: str):
+    comments = await db.comments.find({"deal_id": deal_id}).sort("created_at", -1).to_list(100)
+    for c in comments:
+        c["id"] = str(c.pop("_id"))
+    return comments
+
+@api_router.delete("/comments/{comment_id}")
+async def delete_comment(comment_id: str, request: Request):
+    await admin_required(request)
+    await db.comments.delete_one({"_id": ObjectId(comment_id)})
+    return {"status": "deleted"}
 
 # ===================== APP CONFIG =====================
 

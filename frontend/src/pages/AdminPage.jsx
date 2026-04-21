@@ -247,16 +247,16 @@ export default function AdminPage() {
           </Button>
         </header>
 
-        <div className="flex flex-wrap gap-2 mb-8 bg-white p-2 rounded-2xl border shadow-sm">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:flex md:flex-wrap gap-2 mb-8 bg-white p-2 rounded-2xl border shadow-sm">
           {tabs.map((item) => (
             <Button
               key={item.id}
               variant={activeTab === item.id ? 'default' : 'ghost'}
               onClick={() => setActiveTab(item.id)}
-              className={`flex items-center gap-2 rounded-xl transition-all ${activeTab === item.id ? 'bg-[#ee922c] hover:bg-[#d9811f]' : ''}`}
+              className={`flex items-center gap-2 rounded-xl transition-all text-xs sm:text-sm w-full md:w-auto justify-start ${activeTab === item.id ? 'bg-[#ee922c] hover:bg-[#d9811f]' : ''}`}
             >
-              <item.icon className="w-4 h-4" />
-              <span className="font-semibold">{item.label}</span>
+              <item.icon className="w-4 h-4 flex-shrink-0" />
+              <span className="font-semibold truncate">{item.label}</span>
             </Button>
           ))}
         </div>
@@ -718,7 +718,9 @@ function CouponForm({ item, categories, onSuccess }) {
     affiliate_url: item?.affiliate_url || '',
     code: item?.code || '',
     offer_type: item?.offer_type || '',
-    is_active: item?.is_active ?? true
+    is_active: item?.is_active ?? true,
+    verification_status: item?.verification_status || 'unverified',
+    deal_score: item?.deal_score ?? ''
   });
 
   // IMAGE UPLOAD
@@ -773,7 +775,9 @@ function CouponForm({ item, categories, onSuccess }) {
         category_name: form.category_name.join(","),
         offer_type: form.offer_type || null,
         original_price: form.original_price === '' ? null : parseInt(form.original_price, 10),
-        discounted_price: form.discounted_price === '' ? null : parseInt(form.discounted_price, 10)
+        discounted_price: form.discounted_price === '' ? null : parseInt(form.discounted_price, 10),
+        verification_status: form.verification_status,
+        deal_score: form.deal_score === '' ? null : parseInt(form.deal_score, 10)
       };
 
       if (item) await updateCoupon(item.id, payload);
@@ -938,6 +942,46 @@ function CouponForm({ item, categories, onSuccess }) {
         onChange={(e) => setForm({ ...form, affiliate_url: e.target.value })}
         required
       />
+
+      {/* VERIFICATION & DEAL SCORE */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Verification Status</Label>
+          <select
+            value={form.verification_status}
+            onChange={(e) => setForm({ ...form, verification_status: e.target.value })}
+            className="w-full border rounded-xl px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-[#ee922c] outline-none"
+            data-testid="verification-status-select"
+          >
+            <option value="unverified">Unverified</option>
+            <option value="verified">Verified</option>
+            <option value="expired">Possibly Expired</option>
+          </select>
+        </div>
+        <div className="space-y-2">
+          <Label>Deal Score (0-100)</Label>
+          <Input
+            type="number"
+            min="0"
+            max="100"
+            placeholder="e.g. 85"
+            value={form.deal_score}
+            onChange={(e) => setForm({ ...form, deal_score: e.target.value })}
+            data-testid="deal-score-input"
+          />
+        </div>
+      </div>
+
+      {/* ACTIVE TOGGLE */}
+      <label className="flex items-center gap-2 cursor-pointer">
+        <input
+          type="checkbox"
+          checked={form.is_active}
+          onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
+          className="rounded"
+        />
+        <span className="text-sm font-medium">Active</span>
+      </label>
 
       {/* SUBMIT */}
       <Button

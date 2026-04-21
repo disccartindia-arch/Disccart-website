@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, memo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { SlidersHorizontal, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { getFilterConfig } from '../lib/api';
@@ -27,6 +28,7 @@ const CheckChip = memo(function CheckChip({ label, isSelected, onToggle }) {
 });
 
 export default function FilterDrawer({ onApply }) {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [config, setConfig] = useState(null);
   const [loaded, setLoaded] = useState(false);
@@ -68,6 +70,10 @@ export default function FilterDrawer({ onApply }) {
     if (selectedDealType) filters.deal_type = selectedDealType.value;
     onApply?.(filters);
     setIsOpen(false);
+    // Navigate to deals page so filters are applied there
+    if (Object.keys(filters).length > 0) {
+      navigate('/deals');
+    }
   };
 
   const handleClear = () => {
@@ -112,15 +118,17 @@ export default function FilterDrawer({ onApply }) {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="fixed right-0 top-0 bottom-0 w-full max-w-sm bg-white z-50 shadow-2xl overflow-y-auto"
+              className="fixed right-0 top-0 bottom-0 w-full max-w-sm bg-white z-50 shadow-2xl flex flex-col"
               data-testid="filter-drawer"
             >
-              <div className="p-6 space-y-6">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xl font-black text-gray-900">Filters</h2>
-                  <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-gray-100 rounded-full" data-testid="filter-close"><X className="w-5 h-5" /></button>
-                </div>
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 pb-3 flex-shrink-0">
+                <h2 className="text-xl font-black text-gray-900">Filters</h2>
+                <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-gray-100 rounded-full" data-testid="filter-close"><X className="w-5 h-5" /></button>
+              </div>
 
+              {/* Scrollable content */}
+              <div className="flex-1 overflow-y-auto px-6 pb-4 space-y-6">
                 {/* Deal Type */}
                 {dealTypeFilters.length > 0 && (
                   <div className="space-y-3">
@@ -180,11 +188,14 @@ export default function FilterDrawer({ onApply }) {
                     </div>
                   </div>
                 )}
+              </div>
 
-                <div className="flex gap-3 pt-4 border-t">
-                  <Button variant="outline" className="flex-1 h-12 rounded-xl" onClick={handleClear} data-testid="filter-clear">Clear All</Button>
-                  <Button className="flex-1 h-12 rounded-xl bg-[#ee922c]" onClick={handleApply} data-testid="filter-apply">Apply Filters</Button>
-                </div>
+              {/* Sticky bottom buttons - always visible above bottom nav */}
+              <div className="flex gap-3 p-4 pb-24 sm:pb-4 border-t bg-white flex-shrink-0">
+                <Button variant="outline" className="flex-1 h-12 rounded-xl" onClick={handleClear} data-testid="filter-clear">Clear All</Button>
+                <Button className="flex-1 h-12 rounded-xl bg-[#ee922c] hover:bg-[#d9811f] text-white font-bold" onClick={handleApply} data-testid="filter-apply">
+                  Apply Filters {activeCount > 0 && `(${activeCount})`}
+                </Button>
               </div>
             </motion.div>
           </>

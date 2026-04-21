@@ -390,6 +390,27 @@ export const trackPopupClick = async (id) => {
   try { await api.post(`/popups/${id}/click`); } catch {}
 };
 
+// ===================== LIKES & COMMENTS =====================
+export const toggleLike = async (dealId, userId) => {
+  const { data } = await api.post(`/deals/${dealId}/like`, { user_id: userId });
+  return data;
+};
+
+export const getLikes = async (dealId, userId) => {
+  const { data } = await api.get(`/deals/${dealId}/likes`, { params: { user_id: userId } });
+  return data;
+};
+
+export const addComment = async (dealId, userId, userName, text) => {
+  const { data } = await api.post(`/deals/${dealId}/comments`, { user_id: userId, user_name: userName, text });
+  return data;
+};
+
+export const getComments = async (dealId) => {
+  const { data } = await api.get(`/deals/${dealId}/comments`);
+  return Array.isArray(data) ? data : [];
+};
+
 export const getCouponsOnly = async (params = {}) => {
   const { data } = await api.get('/coupons-only', { params });
   return Array.isArray(data) ? data : [];

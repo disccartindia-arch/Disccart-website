@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { BadgeCheck, Copy, ExternalLink, Tag, ShieldAlert, ShieldX, TrendingUp, Heart, Clock } from 'lucide-react';
+import { BadgeCheck, Copy, ExternalLink, Tag, ShieldAlert, ShieldX, TrendingUp, Heart, Clock, MessageCircle, ThumbsUp } from 'lucide-react';
 import { motion } from 'framer-motion';
 import CouponRevealModal from './CouponRevealModal';
+import DealDetailModal from './DealDetailModal';
 import { ShareButtonsCompact } from './ShareButtons';
-import { resolveImageUrl, addToWishlist, removeFromWishlist } from '../lib/api';
+import { resolveImageUrl, addToWishlist, removeFromWishlist, getLikes, getComments } from '../lib/api';
 import { toast } from 'sonner';
 
 function DealScoreBadge({ score }) {
@@ -61,8 +62,11 @@ function VerificationBadge({ status }) {
 
 export default function DealCard({ deal, wishlistedIds = [], onWishlistChange }) {
   const [showModal, setShowModal] = useState(false);
+  const [showDetail, setShowDetail] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [countdown, setCountdown] = useState('');
+  const [likeCount, setLikeCount] = useState(0);
+  const [commentCount, setCommentCount] = useState(0);
 
   // --- URL & ID FIXES ---
   const dealId = deal.id || deal._id;
@@ -71,6 +75,13 @@ export default function DealCard({ deal, wishlistedIds = [], onWishlistChange })
   useEffect(() => {
     setIsWishlisted(wishlistedIds.includes(dealId));
   }, [wishlistedIds, dealId]);
+
+  // Fetch like/comment counts
+  useEffect(() => {
+    if (!dealId) return;
+    getLikes(dealId).then(d => setLikeCount(d.count || 0)).catch(() => {});
+    getComments(dealId).then(d => setCommentCount(Array.isArray(d) ? d.length : 0)).catch(() => {});
+  }, [dealId]);
 
   // Expiry countdown ticker
   useEffect(() => {
@@ -271,20 +282,43 @@ export default function DealCard({ deal, wishlistedIds = [], onWishlistChange })
           </div>
         )}
 
-        {/* Share Buttons */}
+        {/* Like & Comment counts + Share */}
         <div className="mt-3 pt-3 border-t border-gray-100">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-400 font-medium">Share this deal</span>
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowDetail(true); }}
+              className="flex items-center gap-4 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              data-testid={`social-stats-${dealId}`}
+            >
+              <span className="flex items-center gap-1">
+                <Heart className="w-3.5 h-3.5" /> {likeCount}
+              </span>
+              <span className="flex items-center gap-1">
+                <MessageCircle className="w-3.5 h-3.5" /> {commentCount}
+              </span>
+            </button>
             <ShareButtonsCompact deal={sanitizedDeal} />
           </div>
         </div>
       </motion.div>
 
-      {/* Reveal Modal - Passing the sanitized deal */}
+      {/* Reveal Modal */}
       <CouponRevealModal 
         deal={sanitizedDeal} 
         isOpen={showModal} 
         onClose={() => setShowModal(false)} 
+      />
+
+      {/* Deal Detail Modal with Likes & Comments */}
+      <DealDetailModal
+        deal={sanitizedDeal}
+        isOpen={showDetail}
+        onClose={() => {
+          setShowDetail(false);
+          // Refresh counts after modal closes
+          getLikes(dealId).then(d => setLikeCount(d.count || 0)).catch(() => {});
+          getComments(dealId).then(d => setCommentCount(Array.isArray(d) ? d.length : 0)).catch(() => {});
+        }}
       />
     </>
   );
