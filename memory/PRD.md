@@ -65,6 +65,16 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
   - DealDetailModal: Full deal detail popup with image, pricing, code, verification, like button, comments section
   - Deal cards show like count + comment count at bottom, clicking opens DealDetailModal
   - Bug fix: /api/auth/me now returns user id for comment system
+- Phase 23: AI Deal Assistant + Enhanced Search (April 21, 2026)
+  - AI DealBot: Floating chat widget with GPT-4o (via Emergent LLM key), searches DB for relevant products, returns ranked recommendations
+  - AI system prompt: Smart shopping assistant personality, suggests deals, asks follow-ups, recommends alternatives
+  - Synonym expansion engine: 18+ synonym groups (phone→mobile, shoes→sneakers, fashion→clothes, etc.)
+  - Enhanced Search: GET /api/search with fuzzy matching, category/brand/price/discount filters, sort options (relevance/price/newest/discount)
+  - Search Autocomplete: GET /api/search/suggest returns deal titles, brands, and categories matching query (debounced 300ms)
+  - SmartSearchBar: Replaced old search in Header with autocomplete dropdown + "Ask DealBot AI" suggestion
+  - SearchPage: Full results page with sort dropdown, keyword tags showing synonym expansion, skeleton loading
+  - Quick prompts in chat: "Best deals today", "Electronics under ₹1000", "Fashion coupons", "Food delivery offers"
+  - Graceful fallback: If AI budget exceeded, still returns product results from database
 
 ## Key API Endpoints
 - POST /api/auth/login, POST /api/auth/register, GET /api/auth/me
@@ -81,6 +91,9 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
 - GET /api/hero-config, PATCH /api/admin/hero-config
 - GET /api/popups, GET /api/popups/active, POST/PUT/DELETE /api/admin/popups/{id}
 - POST /api/popups/{id}/view, POST /api/popups/{id}/click
+- POST /api/ai/chat (AI Deal Assistant)
+- GET /api/search (Enhanced search with filters, sort, pagination)
+- GET /api/search/suggest (Autocomplete suggestions)
 - POST /api/deals/{id}/like, GET /api/deals/{id}/likes
 - POST /api/deals/{id}/comments, GET /api/deals/{id}/comments
 - CRUD: /api/pretty-links, /api/pages, /api/blog
