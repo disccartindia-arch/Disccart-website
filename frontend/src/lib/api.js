@@ -411,6 +411,23 @@ export const getComments = async (dealId) => {
   return Array.isArray(data) ? data : [];
 };
 
+// ===================== AI ASSISTANT =====================
+export const aiChat = async (message, sessionId) => {
+  const { data } = await api.post('/ai/chat', { message, session_id: sessionId });
+  return data;
+};
+
+// ===================== ENHANCED SEARCH =====================
+export const enhancedSearch = async (params = {}) => {
+  const { data } = await api.get('/search', { params });
+  return data;
+};
+
+export const searchSuggestions = async (q) => {
+  const { data } = await api.get('/search/suggest', { params: { q } });
+  return data?.suggestions || [];
+};
+
 export const getCouponsOnly = async (params = {}) => {
   const { data } = await api.get('/coupons-only', { params });
   return Array.isArray(data) ? data : [];

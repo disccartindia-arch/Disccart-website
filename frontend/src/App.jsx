@@ -43,6 +43,7 @@ import StoreDetailPage from "./pages/StoreDetailPage";
 import ScrollToTop from "./components/ScrollToTop";
 import IntroAnimation from "./components/IntroAnimation";
 import PopupManager from "./components/PopupManager";
+import AIChatWidget from "./components/AIChatWidget";
 
 function AdminRoute() {
   const { user, loading, isAdmin } = useAuth();
@@ -89,6 +90,7 @@ function App() {
             <BottomNav />
             <ScrollToTop />
             <PopupManager />
+            <AIChatWidget />
             <Toaster position="top-center" richColors />
           </div>
         </AnalyticsProvider>

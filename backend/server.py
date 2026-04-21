@@ -1354,7 +1354,314 @@ async def delete_comment(comment_id: str, request: Request):
     await db.comments.delete_one({"_id": ObjectId(comment_id)})
     return {"status": "deleted"}
 
-# ===================== APP CONFIG =====================
+# ===================== AI DEAL ASSISTANT =====================
+
+SYNONYMS = {
+    "phone": ["mobile", "smartphone", "cellphone"],
+    "mobile": ["phone", "smartphone"],
+    "laptop": ["notebook", "computer"],
+    "shoes": ["sneakers", "footwear", "sandals"],
+    "sneakers": ["shoes", "footwear"],
+    "clothes": ["fashion", "apparel", "clothing", "wear"],
+    "fashion": ["clothes", "apparel", "clothing"],
+    "food": ["dining", "restaurant", "delivery", "meal"],
+    "beauty": ["cosmetics", "makeup", "skincare"],
+    "electronics": ["gadgets", "tech", "devices"],
+    "travel": ["flights", "hotels", "booking", "trip"],
+    "amazon": ["amazon.in"],
+    "flipkart": ["flipkart.com"],
+    "myntra": ["myntra.com"],
+}
+
+def extract_keywords(message: str) -> list:
+    stop_words = {"i", "me", "my", "the", "a", "an", "is", "are", "was", "for", "on",
+                  "in", "to", "of", "and", "or", "not", "it", "do", "can", "you",
+                  "have", "has", "any", "best", "good", "great", "show", "find",
+                  "get", "want", "need", "looking", "search", "deal", "deals",
+                  "coupon", "coupons", "offer", "offers", "discount", "discounts",
+                  "please", "tell", "give", "what", "which", "where", "how", "this", "that"}
+    words = re.findall(r'[a-zA-Z0-9]+', message.lower())
+    keywords = [w for w in words if w not in stop_words and len(w) > 1]
+    expanded = list(keywords)
+    for kw in keywords:
+        if kw in SYNONYMS:
+            expanded.extend(SYNONYMS[kw])
+    return list(set(expanded))
+
+async def search_products_for_ai(keywords: list, limit: int = 10) -> list:
+    if not keywords:
+        deals = await db.coupons.find({"is_active": True}).sort("clicks", -1).limit(limit).to_list(limit)
+    else:
+        or_conditions = []
+        for kw in keywords:
+            regex = {"$regex": kw, "$options": "i"}
+            or_conditions.extend([
+                {"title": regex}, {"brand_name": regex},
+                {"category_name": regex}, {"description": regex},
+                {"code": regex}
+            ])
+        deals = await db.coupons.find({"$or": or_conditions, "is_active": True}).sort("clicks", -1).limit(limit).to_list(limit)
+    for d in deals:
+        d["id"] = str(d.pop("_id"))
+        for k in list(d.keys()):
+            if isinstance(d[k], ObjectId):
+                d[k] = str(d[k])
+            if isinstance(d[k], datetime):
+                d[k] = d[k].isoformat()
+    return deals
+
+@api_router.post("/ai/chat")
+async def ai_chat(request: Request):
+    body = await request.json()
+    message = body.get("message", "").strip()
+
+    if not message:
+        raise HTTPException(400, "message required")
+
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    if not api_key:
+        raise HTTPException(500, "AI service not configured")
+
+    keywords = extract_keywords(message)
+    products = await search_products_for_ai(keywords, limit=8)
+
+    products_context = ""
+    if products:
+        items = []
+        for p in products:
+            price_str = ""
+            if p.get("discounted_price"):
+                price_str = f"₹{p['discounted_price']}"
+                if p.get("original_price"):
+                    price_str += f" (was ₹{p['original_price']})"
+            items.append(
+                f"- {p.get('title','')} | Brand: {p.get('brand_name','')} | "
+                f"Category: {p.get('category_name','')} | Price: {price_str} | "
+                f"Code: {p.get('code','N/A')} | Score: {p.get('deal_score','N/A')}"
+            )
+        products_context = "\n\nAvailable deals from our database:\n" + "\n".join(items)
+
+    system_prompt = (
+        "You are DealBot, the smart shopping assistant for DISCCART.IN — India's best deal discovery platform. "
+        "You help users find the best deals, coupons, and discounts. "
+        "Be friendly, concise, and helpful. Use a casual Indian shopping tone. "
+        "When recommending deals, highlight the discount %, coupon code (if any), and why it's a good deal. "
+        "If the user's query is vague, ask a follow-up question to narrow down. "
+        "If no relevant deals are found, suggest what categories to explore or ask for more details. "
+        "Keep responses under 150 words. Use bullet points for multiple deals."
+        + products_context
+    )
+
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        import uuid
+
+        session_id = body.get("session_id", str(uuid.uuid4()))
+
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"dealbot_{session_id}",
+            system_message=system_prompt
+        )
+        chat.with_model("openai", "gpt-4o")
+
+        user_msg = UserMessage(text=message)
+        reply = await chat.send_message(user_msg)
+
+        product_cards = []
+        for p in products[:5]:
+            product_cards.append({
+                "id": p.get("id"),
+                "title": p.get("title", ""),
+                "brand": p.get("brand_name", ""),
+                "category": p.get("category_name", ""),
+                "price": p.get("discounted_price"),
+                "original_price": p.get("original_price"),
+                "code": p.get("code"),
+                "image_url": p.get("image_url"),
+                "deal_score": p.get("deal_score"),
+                "affiliate_url": p.get("affiliate_url", ""),
+            })
+
+        return {
+            "reply": reply,
+            "products": product_cards,
+            "keywords": keywords[:5]
+        }
+
+    except Exception as e:
+        logger.error(f"AI chat error: {e}")
+        fallback_reply = "I'm having trouble connecting right now. "
+        if products:
+            fallback_reply += f"But I found {len(products)} deals matching your search! Check them out below."
+        else:
+            fallback_reply += "Try browsing our categories or use the search bar to find deals."
+
+        product_cards = []
+        for p in products[:5]:
+            product_cards.append({
+                "id": p.get("id"),
+                "title": p.get("title", ""),
+                "brand": p.get("brand_name", ""),
+                "price": p.get("discounted_price"),
+                "original_price": p.get("original_price"),
+                "code": p.get("code"),
+                "image_url": p.get("image_url"),
+            })
+
+        return {"reply": fallback_reply, "products": product_cards, "keywords": keywords[:5]}
+
+
+# ===================== ENHANCED SEARCH =====================
+
+@api_router.get("/search")
+async def enhanced_search(
+    q: str = "",
+    category: Optional[str] = None,
+    brand: Optional[str] = None,
+    sort: Optional[str] = "relevance",
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    min_discount: Optional[float] = None,
+    limit: int = 20,
+    page: int = 1
+):
+    cache_key = cache.make_key("search", q=q, category=category, brand=brand,
+                                sort=sort, min_price=min_price, max_price=max_price,
+                                min_discount=min_discount, limit=limit, page=page)
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    query_filter = {"is_active": True}
+    keywords = extract_keywords(q) if q else []
+
+    if keywords:
+        or_conditions = []
+        for kw in keywords:
+            regex = {"$regex": kw, "$options": "i"}
+            or_conditions.extend([
+                {"title": regex}, {"brand_name": regex},
+                {"category_name": regex}, {"description": regex},
+                {"code": regex}
+            ])
+        query_filter["$or"] = or_conditions
+
+    if category and category not in ["All", "undefined"]:
+        query_filter["category_name"] = {"$regex": category, "$options": "i"}
+    if brand:
+        query_filter["brand_name"] = {"$regex": brand, "$options": "i"}
+    if min_price is not None:
+        query_filter["discounted_price"] = {"$gte": min_price}
+    if max_price is not None:
+        query_filter.setdefault("discounted_price", {})
+        if isinstance(query_filter["discounted_price"], dict):
+            query_filter["discounted_price"]["$lte"] = max_price
+        else:
+            query_filter["discounted_price"] = {"$gte": min_price, "$lte": max_price}
+    if min_discount is not None:
+        query_filter["discount_percentage"] = {"$gte": min_discount}
+
+    sort_field = [("clicks", -1), ("created_at", -1)]
+    if sort == "price_low":
+        sort_field = [("discounted_price", 1)]
+    elif sort == "price_high":
+        sort_field = [("discounted_price", -1)]
+    elif sort == "newest":
+        sort_field = [("created_at", -1)]
+    elif sort == "discount":
+        sort_field = [("discount_percentage", -1)]
+
+    total = await db.coupons.count_documents(query_filter)
+    skip = (page - 1) * limit
+    results = await db.coupons.find(query_filter).sort(sort_field).skip(skip).limit(limit).to_list(limit)
+    for r in results:
+        r["id"] = str(r.pop("_id"))
+
+    # Generate suggestions (autocomplete-style)
+    suggestions = []
+    if q:
+        suggest_pipeline = [
+            {"$match": {"is_active": True}},
+            {"$group": {"_id": "$brand_name"}},
+            {"$match": {"_id": {"$regex": q, "$options": "i"}}},
+            {"$limit": 5}
+        ]
+        brand_suggestions = await db.coupons.aggregate(suggest_pipeline).to_list(5)
+        suggestions = [s["_id"] for s in brand_suggestions if s["_id"]]
+
+        cat_pipeline = [
+            {"$match": {"is_active": True}},
+            {"$group": {"_id": "$category_name"}},
+            {"$match": {"_id": {"$regex": q, "$options": "i"}}},
+            {"$limit": 5}
+        ]
+        cat_suggestions = await db.coupons.aggregate(cat_pipeline).to_list(5)
+        suggestions.extend([s["_id"] for s in cat_suggestions if s["_id"] and s["_id"] not in suggestions])
+
+    result = {
+        "results": results,
+        "suggestions": suggestions[:8],
+        "total": total,
+        "page": page,
+        "has_more": (skip + limit) < total,
+        "keywords": keywords[:5]
+    }
+    if not q:
+        cache.set(cache_key, result, CACHE_DEALS)
+    else:
+        cache.set(cache_key, result, 60)
+    return result
+
+@api_router.get("/search/suggest")
+async def search_suggestions(q: str = ""):
+    if not q or len(q) < 2:
+        return {"suggestions": []}
+
+    cache_key = f"suggest:{q.lower()[:20]}"
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    regex = {"$regex": q, "$options": "i"}
+
+    # Search titles, brands, categories in parallel
+    title_pipeline = [
+        {"$match": {"is_active": True, "title": regex}},
+        {"$project": {"title": 1, "_id": 0}},
+        {"$limit": 5}
+    ]
+    brand_pipeline = [
+        {"$match": {"is_active": True, "brand_name": regex}},
+        {"$group": {"_id": "$brand_name"}},
+        {"$limit": 5}
+    ]
+    cat_pipeline = [
+        {"$match": {"is_active": True, "category_name": regex}},
+        {"$group": {"_id": "$category_name"}},
+        {"$limit": 5}
+    ]
+
+    import asyncio
+    titles, brands, cats = await asyncio.gather(
+        db.coupons.aggregate(title_pipeline).to_list(5),
+        db.coupons.aggregate(brand_pipeline).to_list(5),
+        db.coupons.aggregate(cat_pipeline).to_list(5)
+    )
+
+    suggestions = []
+    for t in titles:
+        suggestions.append({"text": t["title"], "type": "deal"})
+    for b in brands:
+        if b["_id"]:
+            suggestions.append({"text": b["_id"], "type": "brand"})
+    for c in cats:
+        if c["_id"]:
+            suggestions.append({"text": c["_id"], "type": "category"})
+
+    result = {"suggestions": suggestions[:10]}
+    cache.set(cache_key, result, 120)
+    return result
 
 app.include_router(api_router, prefix="/api")
 

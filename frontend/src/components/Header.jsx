@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Search, Menu, X, User, LogOut, Settings } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Button } from './ui/button';
+import SmartSearchBar from './SmartSearchBar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,18 +13,9 @@ import {
 } from './ui/dropdown-menu';
 
 export default function Header() {
-  const [searchQuery, setSearchQuery] = useState('');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { user, isAuthenticated, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
-
-  const handleSearch = (e) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
-      setSearchQuery('');
-    }
-  };
 
   const handleLogout = async () => {
     await logout();
@@ -53,19 +45,7 @@ export default function Header() {
           </Link>
 
           {/* Desktop Search */}
-          <form onSubmit={handleSearch} className="hidden md:flex flex-1 max-w-xl mx-8">
-            <div className="relative w-full">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search deals, coupons, brands..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-gray-100 rounded-full px-12 py-3 text-base focus:ring-2 focus:ring-[#ee922c] outline-none transition-all"
-                data-testid="search-input"
-              />
-            </div>
-          </form>
+          <SmartSearchBar className="hidden md:block flex-1 max-w-xl mx-8" />
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-4">
@@ -131,19 +111,9 @@ export default function Header() {
         </div>
 
         {/* Mobile Search */}
-        <form onSubmit={handleSearch} className="md:hidden pb-4">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search deals..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-gray-100 rounded-full px-12 py-3 text-base focus:ring-2 focus:ring-[#ee922c] outline-none"
-              data-testid="mobile-search-input"
-            />
-          </div>
-        </form>
+        <div className="md:hidden pb-4">
+          <SmartSearchBar />
+        </div>
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
