@@ -40,41 +40,37 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
   - FilterDrawer preserved on HomePage
 - Phase 20: Better Stack Monitoring (April 10, 2026)
   - Added /api/health endpoint (status, DB connectivity, cache entries, timestamp)
-  - 5 Better Stack monitors created:
-    - DISCCART API Health (ID: 4266513) — /api/health, every 3min
-    - DISCCART Coupons API (ID: 4266514) — /api/coupons, every 3min
-    - DISCCART Categories API (ID: 4266515) — /api/categories, every 5min
-    - DISCCART Stores API (ID: 4266516) — /api/stores, every 5min
-    - DISCCART Backend Uptime (ID: 4266517) — /api/coupons, every 1min
-  - Email alerts enabled for all monitors
-  - Note: /api/health monitor will activate after deploying latest code to Render
+  - 5 Better Stack monitors created
 - Phase 21: Popup System & Intro Animation (April 10, 2026)
-  - IntroAnimation: 2-3s cart logo animation (fly in → items drop → bounce → fly out), sessionStorage-based (once per visit)
-  - Smart PopupManager: 7 popup types (entry, exit_intent, scroll, click, timed, offer, newsletter)
-  - 5 trigger types: on_load, on_scroll, exit_intent, time_delay, click
-  - 5 animation styles: slide_up, slide_down, fade, scale, bounce
-  - Smart display logic: sessionStorage/localStorage frequency control, device/page targeting, date scheduling
+  - IntroAnimation: 2-3s cart logo animation, sessionStorage-based (once per visit)
+  - Smart PopupManager: 7 popup types, 5 trigger types, 5 animation styles
   - Backend: Full popup CRUD + analytics (views, clicks) tracking
   - Admin Popups tab: create/edit/delete/toggle/preview with targeting, scheduling, media upload, analytics display
 - Phase 22: Mobile UX Fixes + Like/Comment System (April 21, 2026)
-  - Admin Panel: Tabs reorganized in 2-column grid (grid-cols-2 sm:grid-cols-3 md:flex) for proper mobile layout
-  - FilterDrawer: Apply button sticky above bottom nav (pb-24 on mobile), navigates to /deals after applying filters
-  - Verification Badge: Added verification_status dropdown (verified/unverified/expired) + deal_score input to admin deal edit form
-  - Like System: Anyone can like deals (visitor ID from localStorage for non-logged users, user ID for logged-in). Toggle like via POST /api/deals/{id}/like
-  - Comment System: Only logged-in users can comment. POST /api/deals/{id}/comments. Max 500 chars.
+  - Admin Panel: Tabs reorganized in 2-column grid for proper mobile layout
+  - FilterDrawer: Apply button sticky above bottom nav
+  - Verification Badge: Added verification_status dropdown + deal_score input to admin deal edit form
+  - Like System: Anyone can like deals (visitor ID from localStorage for non-logged users)
+  - Comment System: Only logged-in users can comment
   - DealDetailModal: Full deal detail popup with image, pricing, code, verification, like button, comments section
-  - Deal cards show like count + comment count at bottom, clicking opens DealDetailModal
-  - Bug fix: /api/auth/me now returns user id for comment system
 - Phase 23: AI Deal Assistant + Enhanced Search (April 21, 2026)
-  - AI DealBot: Floating chat widget with GPT-4o (via Emergent LLM key), searches DB for relevant products, returns ranked recommendations
-  - AI system prompt: Smart shopping assistant personality, suggests deals, asks follow-ups, recommends alternatives
-  - Synonym expansion engine: 18+ synonym groups (phone→mobile, shoes→sneakers, fashion→clothes, etc.)
-  - Enhanced Search: GET /api/search with fuzzy matching, category/brand/price/discount filters, sort options (relevance/price/newest/discount)
-  - Search Autocomplete: GET /api/search/suggest returns deal titles, brands, and categories matching query (debounced 300ms)
-  - SmartSearchBar: Replaced old search in Header with autocomplete dropdown + "Ask DealBot AI" suggestion
-  - SearchPage: Full results page with sort dropdown, keyword tags showing synonym expansion, skeleton loading
-  - Quick prompts in chat: "Best deals today", "Electronics under ₹1000", "Fashion coupons", "Food delivery offers"
-  - Graceful fallback: If AI budget exceeded, still returns product results from database
+  - AI DealBot: Floating chat widget with GPT-4o (via Emergent LLM key)
+  - Synonym expansion engine: 18+ synonym groups
+  - Enhanced Search: GET /api/search with fuzzy matching + filters + sort options
+  - Search Autocomplete: GET /api/search/suggest
+  - SmartSearchBar: Replaced old search in Header with autocomplete dropdown
+  - SearchPage: Full results page with sort dropdown, keyword tags, skeleton loading
+- Phase 24: Compact Feed + Deal Finder (April 29, 2026)
+  - CompactDealCard: Horizontal layout (~100px height), thumbnail left, info center, CTA right
+  - Mobile shows 4-6 deals per viewport (vs 1 before)
+  - DealFinderBar: Sticky filter bar above deal feed with search (300ms debounce), category dropdown, discount % slider (0-90%), min/max price inputs, sort selector, reset button, collapsible on mobile
+  - DealsPage rewritten to use CompactDealCard + DealFinderBar (removed old FilterDrawer dependency)
+  - HomePage mobile uses CompactDealCard for featured/trending/limited sections
+  - HomePage desktop still uses full DealCard grid
+  - Backend: /api/deals/filtered now supports `search` param with $and/$or conflict resolution
+  - Backend: Deterministic pagination with _id as secondary sort key
+  - All affiliate tracking preserved (CouponRevealModal + analytics events intact)
+  - All routing preserved (no URL structure changes)
 
 ## Key API Endpoints
 - POST /api/auth/login, POST /api/auth/register, GET /api/auth/me
@@ -84,7 +80,7 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
 - POST /api/upload-image (Cloudinary)
 - GET /api/stores, GET /api/stores/featured, GET /api/stores/slug/{slug}, POST/PUT/DELETE /api/stores
 - GET /api/admin/filters, PATCH /api/admin/filters (price/discount/deal-type/category/store)
-- GET /api/deals/filtered (category, store, price, discount%, deal_type, sort)
+- GET /api/deals/filtered (category, store, price, discount%, deal_type, search, sort_by)
 - GET /api/deals/trending (24hr window)
 - GET/PATCH /api/admin/trending-config
 - GET /api/slides, GET/POST/PATCH/DELETE /api/admin/slides
@@ -113,8 +109,11 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
 - `comments`: {deal_id, user_id, user_name, text, created_at}
 
 ## Backlog
-- P1: Facebook Pixel tracking
-- P2: Email capture popup
+- P1: Bulk CSV Deal Import (Admin panel drag-and-drop, column mapping, backend insertMany)
+- P1: Image Upload for Categories & Blogs (Cloudinary)
+- P1: Facebook Pixel tracking (currently mocked)
+- P2: Email capture popup for deal alerts
 - P2: Push notifications (Firebase)
 - P2: "Best time to buy" hint
+- P3: AdminPage.jsx refactor (split 1650+ lines into sub-components)
 - P3: Editor/Viewer role UI (backend RBAC ready)

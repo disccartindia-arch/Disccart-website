@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Search, SlidersHorizontal, X, ChevronDown, RotateCcw } from 'lucide-react';
 import { getCategories } from '../lib/api';
 
 export default function DealFinderBar({ onFiltersChange, totalResults = 0, loading = false }) {
   const [expanded, setExpanded] = useState(false);
   const [categories, setCategories] = useState([]);
+  const debounceRef = useRef(null);
 
   // Filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,7 +44,10 @@ export default function DealFinderBar({ onFiltersChange, totalResults = 0, loadi
 
   const handleSearchChange = (val) => {
     setSearchQuery(val);
-    emitFilters({ search: val });
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      emitFilters({ search: val });
+    }, 300);
   };
 
   const handleCategoryChange = (val) => {

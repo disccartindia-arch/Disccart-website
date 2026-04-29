@@ -988,16 +988,16 @@ async def get_filtered_deals(
             disc_cond["$lte"] = max_discount
         match_stage["discount_value"] = disc_cond
 
-    # Sort logic
-    sort_field = {"created_at": -1}
+    # Sort logic — always include _id as tiebreaker for deterministic pagination
+    sort_field = {"created_at": -1, "_id": -1}
     if sort_by == "popularity":
-        sort_field = {"clicks": -1}
+        sort_field = {"clicks": -1, "_id": -1}
     elif sort_by == "price_low":
-        sort_field = {"discounted_price": 1}
+        sort_field = {"discounted_price": 1, "_id": -1}
     elif sort_by == "price_high":
-        sort_field = {"discounted_price": -1}
+        sort_field = {"discounted_price": -1, "_id": -1}
     elif sort_by == "discount":
-        sort_field = {"discount_value": -1}
+        sort_field = {"discount_value": -1, "_id": -1}
 
     pipeline = [
         {"$match": match_stage},
