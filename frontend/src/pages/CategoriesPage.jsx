@@ -108,9 +108,6 @@ export default function CategoriesPage() {
                         <h2 className="font-display font-bold text-2xl mb-1">{category.name}</h2>
                         <p className="text-white/70 text-sm mb-3 line-clamp-2">{category.description}</p>
                         <div className="flex items-center justify-between">
-                          <span className="bg-white/20 px-3 py-1 rounded-full text-sm">
-                            {category.deal_count || 0} deals
-                          </span>
                           <span className="flex items-center gap-1 text-sm font-medium group-hover:gap-2 transition-all">
                             View All <ArrowRight className="w-4 h-4" />
                           </span>

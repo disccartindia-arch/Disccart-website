@@ -235,7 +235,7 @@ export default function HomePage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
                   <div className="absolute bottom-0 left-0 right-0 p-4 text-white">
                     <h3 className="font-display font-bold text-lg">{category.name}</h3>
-                    <p className="text-sm text-white/80">{category.coupon_count || 0} deals</p>
+                    <p className="text-sm text-white/80">{category.description || 'Explore deals'}</p>
                   </div>
                 </Link>
               ))}
