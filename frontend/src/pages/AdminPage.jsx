@@ -631,7 +631,7 @@ export default function AdminPage() {
       {/* --- FORMS AND DIALOGS --- */}
 
       <Dialog open={showCouponDialog} onOpenChange={setShowCouponDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden rounded-3xl bg-white">
           <DialogHeader>
             <DialogTitle className="text-2xl font-black">{editingItem ? 'Edit Deal' : 'Add New Deal'}</DialogTitle>
             <DialogDescription>Fill in the details below. Supported image formats: JPG, PNG, WebP (max 2MB).</DialogDescription>

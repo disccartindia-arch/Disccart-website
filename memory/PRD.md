@@ -9,6 +9,7 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
 - **Database**: MongoDB
 - **Auth**: JWT (Bearer token, role-based: admin/user)
 - **Image Hosting**: Cloudinary
+- **AI**: Emergent LLM Key (GPT-4o via emergentintegrations)
 - **Analytics**: Google Analytics 4
 
 ## What's Implemented
@@ -16,104 +17,72 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
 - Phase 14: Dynamic filters, Cloudinary, Stores CRUD, Filter drawer
 - Phase 15: Secure Auth (JWT roles), Homepage Slider, Dialog accessibility
 - Phase 16: Hero section editor (admin-controlled background/text/colors)
-- Phase 17: GrabOn-style upgrade (April 10, 2026)
-  - Advanced filter system: price brackets + discount filters + deal type filters (all with add/edit/delete/enable/disable/reorder)
-  - Trending deals (24hr window logic + admin config for duration/toggle)
-  - Stores upgrade: slug, description, website_url, category, featured, store_of_month, display_order, logo upload
-  - Store pages: /stores listing (search, featured, store of month) + /stores/:slug detail with deals
-  - Slider upgrade: title, subtitle, btn_text, btn_link, bg_color, swipe support
-  - FilterDrawer: discount % filters, deal type filters
-  - Admin: Site Settings tab (trending config), upgraded Filter Settings, upgraded Store form, upgraded Slide form
-  - Header nav: Stores link added
-- Phase 18: UX Improvements (April 10, 2026)
-  - Load More Pagination: /api/coupons returns {deals, total, page, has_more}; HomePage shows "Load More Deals" button
-  - Scroll-to-Top Button: Floating button (vertically centered right side), appears after 300px scroll
-  - Coupon Page Filtering Fix: /api/coupons-only now only returns deals with non-null/non-empty code field
-  - Filter Refresh Bug Fix: DealsPage clears cached data, shows loading, handles race conditions via filterVersion ref
-- Phase 19: Performance Optimization (April 10, 2026)
-  - Backend In-Memory TTL Cache: MemoryCache class with deals (5min), stores (30min), categories (1hr) TTLs
-  - Cache auto-invalidation on all admin mutations (create/update/delete coupons, categories, stores, slides, hero, trending config)
-  - Categories endpoint optimized: N+1 queries → single aggregation pipeline
-  - Cache-Control headers: public APIs get `s-maxage=60, stale-while-revalidate=300`; admin APIs get `no-cache, no-store`
-  - Independent section loading: HomePage sections (featured, trending, categories, limited, hero) load in parallel with own loading states
-  - Skeleton Loading UI: DealCardSkeleton, StoreCardSkeleton, CouponCardSkeleton, CategoryCardSkeleton components
-  - FilterDrawer preserved on HomePage
-- Phase 20: Better Stack Monitoring (April 10, 2026)
-  - Added /api/health endpoint (status, DB connectivity, cache entries, timestamp)
-  - 5 Better Stack monitors created
-- Phase 21: Popup System & Intro Animation (April 10, 2026)
-  - IntroAnimation: 2-3s cart logo animation, sessionStorage-based (once per visit)
-  - Smart PopupManager: 7 popup types, 5 trigger types, 5 animation styles
-  - Backend: Full popup CRUD + analytics (views, clicks) tracking
-  - Admin Popups tab: create/edit/delete/toggle/preview with targeting, scheduling, media upload, analytics display
-- Phase 22: Mobile UX Fixes + Like/Comment System (April 21, 2026)
-  - Admin Panel: Tabs reorganized in 2-column grid for proper mobile layout
-  - FilterDrawer: Apply button sticky above bottom nav
-  - Verification Badge: Added verification_status dropdown + deal_score input to admin deal edit form
-  - Like System: Anyone can like deals (visitor ID from localStorage for non-logged users)
-  - Comment System: Only logged-in users can comment
-  - DealDetailModal: Full deal detail popup with image, pricing, code, verification, like button, comments section
-- Phase 23: AI Deal Assistant + Enhanced Search (April 21, 2026)
-  - AI DealBot: Floating chat widget with GPT-4o (via Emergent LLM key)
-  - Synonym expansion engine: 18+ synonym groups
-  - Enhanced Search: GET /api/search with fuzzy matching + filters + sort options
-  - Search Autocomplete: GET /api/search/suggest
-  - SmartSearchBar: Replaced old search in Header with autocomplete dropdown
-  - SearchPage: Full results page with sort dropdown, keyword tags, skeleton loading
-- Phase 24: Compact Feed + Deal Finder (April 29, 2026)
-  - CompactDealCard: Horizontal layout (~100px height), thumbnail left, info center, CTA right
-  - Mobile shows 4-6 deals per viewport (vs 1 before)
-  - DealFinderBar: Sticky filter bar above deal feed with search (300ms debounce), category dropdown, discount % slider (0-90%), min/max price inputs, sort selector, reset button, collapsible on mobile
-  - DealsPage rewritten to use CompactDealCard + DealFinderBar (removed old FilterDrawer dependency)
-  - HomePage mobile uses CompactDealCard for featured/trending/limited sections
-  - HomePage desktop still uses full DealCard grid
-  - Backend: /api/deals/filtered now supports `search` param with $and/$or conflict resolution
-  - Backend: Deterministic pagination with _id as secondary sort key
-  - All affiliate tracking preserved (CouponRevealModal + analytics events intact)
-  - All routing preserved (no URL structure changes)
+- Phase 17: GrabOn-style upgrade — advanced filters, trending deals, stores, slider, FilterDrawer
+- Phase 18: UX — Load More, Scroll-to-Top, Coupon filtering, Filter refresh fix
+- Phase 19: Performance — In-memory TTL cache, parallel loading, skeletons
+- Phase 20: Better Stack Monitoring — health endpoint, 5 monitors
+- Phase 21: Popup System & Intro Animation
+- Phase 22: Mobile UX + Like/Comment System + DealDetailModal
+- Phase 23: AI Deal Assistant (DealBot) + Enhanced Smart Search
+- Phase 24: Compact Deal Feed + Deal Finder Bar (April 29, 2026)
+  - CompactDealCard: horizontal layout, 4-6 deals per mobile viewport
+  - DealFinderBar: sticky filter bar (search, category, discount slider, price, sort)
+  - DealsPage rewritten with compact cards + finder
+  - Backend: /api/deals/filtered now supports search param
+- Phase 25: Admin AI Upgrade (April 29, 2026)
+  - AI Auto-Fill in Deals & Coupons form: single input → AI generates title, description, brand, category, prices
+  - Bulk Mode: paste product names → AI generates all → approve/reject → bulk publish
+  - Backend: POST /api/ai/generate-deal, POST /api/ai/generate-deals-bulk
+  - AI Settings admin page (7 sections):
+    1. Conversation Flow: sequential reply chain (editable prompts)
+    2. Prompt Templates: greeting, recommendation, fallback, urgency, upsell, deal alert
+    3. Category Tones: per-category tone selector (technical/trendy/urgent/friendly/luxury/budget)
+    4. AI Personality: tone slider, length selector, aggressiveness, emoji toggle, promo intensity
+    5. Engagement Hooks: re-engagement, exit intent, inactivity timer, deal alert prompt, personalized greeting
+    6. Prime Membership: toggle, tier label, non-member teaser, member unlock, badge config (label/color/icon)
+    7. Smart Notifications: alert frequency, wishlist suggestions, price drop message, limited stock message
+  - Backend: GET/PATCH /api/admin/ai-settings (stored in site_settings collection)
+  - Chatbot now reads AI settings dynamically for personality, tone, templates
+  - Description field added to deal form
+  - Schema-ready: membership_tier field architecture for users/deals (payment flow is future scope)
 
 ## Key API Endpoints
 - POST /api/auth/login, POST /api/auth/register, GET /api/auth/me
 - GET /api/categories, POST/PUT/DELETE /api/categories
-- GET /api/coupons (paginated: returns {deals, total, page, has_more})
-- GET /api/coupons-only (code-only deals, array response)
+- GET /api/coupons (paginated), GET /api/coupons-only
 - POST /api/upload-image (Cloudinary)
-- GET /api/stores, GET /api/stores/featured, GET /api/stores/slug/{slug}, POST/PUT/DELETE /api/stores
-- GET /api/admin/filters, PATCH /api/admin/filters (price/discount/deal-type/category/store)
+- GET /api/stores, GET /api/stores/featured, GET /api/stores/slug/{slug}
+- GET /api/admin/filters, PATCH /api/admin/filters
 - GET /api/deals/filtered (category, store, price, discount%, deal_type, search, sort_by)
-- GET /api/deals/trending (24hr window)
+- GET /api/deals/trending
 - GET/PATCH /api/admin/trending-config
 - GET /api/slides, GET/POST/PATCH/DELETE /api/admin/slides
 - GET /api/hero-config, PATCH /api/admin/hero-config
 - GET /api/popups, GET /api/popups/active, POST/PUT/DELETE /api/admin/popups/{id}
-- POST /api/popups/{id}/view, POST /api/popups/{id}/click
-- POST /api/ai/chat (AI Deal Assistant)
-- GET /api/search (Enhanced search with filters, sort, pagination)
-- GET /api/search/suggest (Autocomplete suggestions)
-- POST /api/deals/{id}/like, GET /api/deals/{id}/likes
-- POST /api/deals/{id}/comments, GET /api/deals/{id}/comments
+- POST /api/ai/chat (DealBot — reads AI settings)
+- POST /api/ai/generate-deal (AI Auto-Fill)
+- POST /api/ai/generate-deals-bulk (Bulk AI generation)
+- GET /api/admin/ai-settings, PATCH /api/admin/ai-settings
+- GET /api/search, GET /api/search/suggest
+- POST /api/deals/{id}/like, POST /api/deals/{id}/comments
 - CRUD: /api/pretty-links, /api/pages, /api/blog
 - Wishlist: GET/POST/DELETE /api/wishlist/{user_id}
 
 ## DB Collections
-- `coupons`: {title, brand_name, category_name, code, affiliate_url, offer_type, image_url, original_price (int), discounted_price (int), discount_value, expires_at, is_active, clicks, created_at}
-- `categories`: {name, slug, icon, image_url, background_image_url, show_in_filter, display_order}
-- `stores`: {name, slug, logo_url, description, website_url, category, show_in_filter, is_active, is_featured, is_store_of_month, display_order}
-- `filter_configs`: {_id: "global", price_brackets, discount_filters, deal_type_filters}
-- `homepage_slides`: {image_url, title, subtitle, btn_text, btn_link, bg_color, redirect_url, is_active, order}
-- `site_settings`: {_id: "hero"|"trending", ...config}
-- `users`: {email, password_hash, role (admin|user)}
-- `wishlists`, `clicks`, `pretty_links`, `pages`, `blog_posts`
-- `popups`: {title, description, cta_text, cta_link, image_url, video_url, popup_type, trigger, scroll_percent, delay_seconds, target_pages[], target_devices[], animation_style, is_active, frequency, start_date, end_date, priority, views, clicks}
-- `likes`: {deal_id, user_id, created_at}
-- `comments`: {deal_id, user_id, user_name, text, created_at}
+- `coupons`: title, description, brand_name, category_name, code, affiliate_url, offer_type, image_url, original_price, discounted_price, discount_value, expires_at, is_active, clicks, deal_score, verification_status, created_at
+- `categories`, `stores`, `filter_configs`, `homepage_slides`
+- `site_settings`: {_id: "hero"|"trending"|"ai_settings", ...config}
+- `users`: email, password_hash, role (admin|user)
+- `popups`, `likes`, `comments`, `wishlists`, `clicks`, `pretty_links`, `pages`, `blog_posts`
 
 ## Backlog
-- P1: Bulk CSV Deal Import (Admin panel drag-and-drop, column mapping, backend insertMany)
+- P1: Bulk CSV Deal Import (Admin panel drag-and-drop, column mapping)
 - P1: Image Upload for Categories & Blogs (Cloudinary)
 - P1: Facebook Pixel tracking (currently mocked)
 - P2: Email capture popup for deal alerts
 - P2: Push notifications (Firebase)
 - P2: "Best time to buy" hint
-- P3: AdminPage.jsx refactor (split 1650+ lines into sub-components)
+- P2: Prime membership payment flow (schema ready)
+- P3: AdminPage.jsx refactor (1850+ lines → sub-components)
+- P3: server.py refactor (1900+ lines → modules)
 - P3: Editor/Viewer role UI (backend RBAC ready)
