@@ -417,6 +417,27 @@ export const aiChat = async (message, sessionId) => {
   return data;
 };
 
+export const aiGenerateDeal = async (query) => {
+  const { data } = await api.post('/ai/generate-deal', { query });
+  return data;
+};
+
+export const aiGenerateDealsBulk = async (queries) => {
+  const { data } = await api.post('/ai/generate-deals-bulk', { queries });
+  return data;
+};
+
+// ===================== AI SETTINGS =====================
+export const getAISettings = async () => {
+  const { data } = await api.get('/admin/ai-settings');
+  return data;
+};
+
+export const updateAISettings = async (settings) => {
+  const { data } = await api.patch('/admin/ai-settings', settings);
+  return data;
+};
+
 // ===================== ENHANCED SEARCH =====================
 export const enhancedSearch = async (params = {}) => {
   const { data } = await api.get('/search', { params });

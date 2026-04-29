@@ -1458,16 +1458,72 @@ async def ai_chat(request: Request):
             )
         products_context = "\n\nAvailable deals from our database:\n" + "\n".join(items)
 
+    # Load AI settings for dynamic personality
+    ai_settings = await db.site_settings.find_one({"_id": "ai_settings"}) or {}
+
+    # Build dynamic system prompt from settings
+    personality = ai_settings.get("personality", {})
+    tone_val = personality.get("tone", 50)
+    tone_word = "casual and friendly" if tone_val > 60 else "professional" if tone_val < 40 else "balanced"
+    length_pref = personality.get("length", "medium")
+    length_instruction = "Keep responses under 80 words." if length_pref == "short" else "Keep responses under 250 words." if length_pref == "detailed" else "Keep responses under 150 words."
+    aggressiveness = personality.get("aggressiveness", "balanced")
+    agg_instruction = "Use soft, helpful language." if aggressiveness == "soft" else "Create urgency and excitement!" if aggressiveness == "high_urgency" else ""
+    use_emoji = personality.get("emoji_usage", True)
+    emoji_instruction = "Use emojis naturally." if use_emoji else "Do NOT use any emojis."
+    promo_intensity = personality.get("promo_intensity", 50)
+    promo_instruction = "Be very promotional and highlight deals aggressively." if promo_intensity > 70 else "Be subtle about promotions." if promo_intensity < 30 else ""
+
+    # Reply chain: check session turn count
+    reply_chain = ai_settings.get("reply_chain", [])
+    engagement = ai_settings.get("engagement", {})
+    personalized = engagement.get("personalized_greeting", False)
+
+    # Category tones
+    category_tones = ai_settings.get("category_tones", {})
+
+    # Prompt templates
+    templates = ai_settings.get("prompt_templates", {})
+    greeting_tpl = templates.get("greeting", "")
+    fallback_tpl = templates.get("fallback", "")
+
+    # Prime membership config
+    prime_config = ai_settings.get("prime_membership", {})
+    prime_enabled = prime_config.get("enabled", False)
+    prime_label = prime_config.get("tier_label", "Prime Member Deal")
+
+    # Build category tone instruction from matched keywords
+    tone_instruction = ""
+    for kw in keywords:
+        for cat_name, tone in category_tones.items():
+            if kw.lower() in cat_name.lower():
+                tone_instruction = f"For {cat_name} category, use a {tone} tone. "
+                break
+
     system_prompt = (
-        "You are DealBot, the smart shopping assistant for DISCCART.IN — India's best deal discovery platform. "
-        "You help users find the best deals, coupons, and discounts. "
-        "Be friendly, concise, and helpful. Use a casual Indian shopping tone. "
-        "When recommending deals, highlight the discount %, coupon code (if any), and why it's a good deal. "
-        "If the user's query is vague, ask a follow-up question to narrow down. "
-        "If no relevant deals are found, suggest what categories to explore or ask for more details. "
-        "Keep responses under 150 words. Use bullet points for multiple deals."
-        + products_context
+        f"You are DealBot, the smart shopping assistant for DISCCART.IN — India's best deal discovery platform. "
+        f"Your tone is {tone_word}. {length_instruction} {agg_instruction} {emoji_instruction} {promo_instruction} "
+        f"{tone_instruction}"
+        f"You help users find the best deals, coupons, and discounts. "
+        f"When recommending deals, highlight the discount %, coupon code (if any), and why it's a good deal. "
+        f"If the user's query is vague, ask a follow-up question to narrow down. "
+        f"If no relevant deals are found, suggest what categories to explore or ask for more details. "
+        f"Use bullet points for multiple deals."
     )
+
+    if personalized:
+        system_prompt += " If the user gives their name, use it naturally in conversation."
+    if reply_chain:
+        system_prompt += f" You have {len(reply_chain)} configured reply stages."
+
+    if greeting_tpl and len([m for m in [] if True]) == 0:
+        system_prompt += f"\nGreeting style: {greeting_tpl}"
+    if fallback_tpl:
+        system_prompt += f"\nWhen no deals match: {fallback_tpl}"
+    if prime_enabled:
+        system_prompt += f"\nSome deals are marked as '{prime_label}'. For these, mention the exclusive nature."
+
+    system_prompt += products_context
 
     try:
         from emergentintegrations.llm.chat import LlmChat, UserMessage
@@ -1679,6 +1735,156 @@ async def search_suggestions(q: str = ""):
     result = {"suggestions": suggestions[:10]}
     cache.set(cache_key, result, 120)
     return result
+
+# ===================== AI DEAL GENERATION =====================
+
+@api_router.post("/ai/generate-deal")
+async def ai_generate_deal(request: Request):
+    await admin_required(request)
+    body = await request.json()
+    product_query = body.get("query", "").strip()
+    if not product_query:
+        raise HTTPException(400, "query required")
+
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    if not api_key:
+        raise HTTPException(500, "AI service not configured")
+
+    prompt = f"""You are a deal content generator for DISCCART.IN, an Indian deals platform.
+Given the product query: "{product_query}"
+
+Generate realistic deal listing content. Research what this product typically costs and create a compelling deal.
+Return ONLY valid JSON (no markdown, no code blocks) with this exact structure:
+{{
+  "title": "SEO-optimized deal title (max 80 chars)",
+  "seo_headline": "Short attention-grabbing headline",
+  "short_description": "One-line description for cards (max 100 chars)",
+  "description": "Detailed deal description (2-3 sentences, highlight savings and urgency)",
+  "brand_name": "Brand name",
+  "category_name": "Best matching category from: Electronics, Fashion, Food & Dining, Travel, Beauty, Home & Living, Health, Sports, Books, Gaming",
+  "original_price": 0,
+  "discounted_price": 0,
+  "discount_percentage": 0,
+  "urgency_hook": "Urgency text (e.g. 'Only 3 hours left!' or 'Limited stock!')",
+  "cta_text": "CTA button text",
+  "tags": ["tag1", "tag2", "tag3"],
+  "image_search_term": "search term to find product image"
+}}
+
+Rules:
+- Prices must be realistic Indian Rupee amounts
+- discount_percentage = round((original - discounted) / original * 100)
+- Use varied, natural language — no repetitive templates
+- Make it feel like a real live deal, not AI-generated
+- Category must be one of the listed options"""
+
+    try:
+        from emergentintegrations.llm.chat import LlmChat, UserMessage
+        import uuid
+
+        chat = LlmChat(
+            api_key=api_key,
+            session_id=f"dealgen_{uuid.uuid4().hex[:8]}",
+            system_message="You are a JSON-only deal content generator. Return only valid JSON."
+        )
+        chat.with_model("openai", "gpt-4o")
+
+        reply = await chat.send_message(UserMessage(text=prompt))
+
+        # Parse JSON from reply
+        reply_text = reply.strip()
+        if reply_text.startswith("```"):
+            reply_text = reply_text.split("\n", 1)[1] if "\n" in reply_text else reply_text[3:]
+            if reply_text.endswith("```"):
+                reply_text = reply_text[:-3]
+            reply_text = reply_text.strip()
+            if reply_text.startswith("json"):
+                reply_text = reply_text[4:].strip()
+
+        deal_data = json_module.loads(reply_text)
+        return {"success": True, "deal": deal_data}
+
+    except json_module.JSONDecodeError as e:
+        logger.error(f"AI deal gen JSON parse error: {e}")
+        return {"success": False, "error": "AI returned invalid format. Try again."}
+    except Exception as e:
+        logger.error(f"AI deal gen error: {e}")
+        return {"success": False, "error": str(e)[:200]}
+
+
+@api_router.post("/ai/generate-deals-bulk")
+async def ai_generate_deals_bulk(request: Request):
+    await admin_required(request)
+    body = await request.json()
+    queries = body.get("queries", [])
+    if not queries or not isinstance(queries, list):
+        raise HTTPException(400, "queries array required")
+
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    if not api_key:
+        raise HTTPException(500, "AI service not configured")
+
+    results = []
+    for q in queries[:20]:  # Max 20 at a time
+        q = q.strip()
+        if not q:
+            results.append({"query": q, "success": False, "error": "Empty query"})
+            continue
+        try:
+            from emergentintegrations.llm.chat import LlmChat, UserMessage
+            import uuid
+
+            prompt = f"""Generate a deal listing for: "{q}"
+Return ONLY valid JSON with: title, seo_headline, short_description, description, brand_name, category_name (Electronics/Fashion/Food & Dining/Travel/Beauty/Home & Living/Health/Sports/Books/Gaming), original_price (INR int), discounted_price (INR int), discount_percentage (int), urgency_hook, cta_text, tags (array). Prices must be realistic. Use varied natural language."""
+
+            chat = LlmChat(
+                api_key=api_key,
+                session_id=f"bulkgen_{uuid.uuid4().hex[:8]}",
+                system_message="Return only valid JSON. No markdown."
+            )
+            chat.with_model("openai", "gpt-4o")
+            reply = await chat.send_message(UserMessage(text=prompt))
+
+            reply_text = reply.strip()
+            if reply_text.startswith("```"):
+                reply_text = reply_text.split("\n", 1)[1] if "\n" in reply_text else reply_text[3:]
+                if reply_text.endswith("```"):
+                    reply_text = reply_text[:-3]
+                reply_text = reply_text.strip()
+                if reply_text.startswith("json"):
+                    reply_text = reply_text[4:].strip()
+
+            deal_data = json_module.loads(reply_text)
+            results.append({"query": q, "success": True, "deal": deal_data})
+        except Exception as e:
+            results.append({"query": q, "success": False, "error": str(e)[:100]})
+
+    return {"results": results}
+
+
+# ===================== AI SETTINGS =====================
+
+@api_router.get("/admin/ai-settings")
+async def get_ai_settings(request: Request):
+    await admin_required(request)
+    settings = await db.site_settings.find_one({"_id": "ai_settings"})
+    if not settings:
+        return {"_id": "ai_settings"}
+    settings.pop("_id", None)
+    return settings
+
+@api_router.patch("/admin/ai-settings")
+async def update_ai_settings(request: Request):
+    await admin_required(request)
+    body = await request.json()
+    body.pop("_id", None)
+    await db.site_settings.update_one(
+        {"_id": "ai_settings"},
+        {"$set": body},
+        upsert=True
+    )
+    return {"status": "saved"}
+
 
 app.include_router(api_router, prefix="/api")
 

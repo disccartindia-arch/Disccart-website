@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Tag, Upload, Link2, FileText, BookOpen,
   Plus, Pencil, Trash2, X, Loader2, FileSpreadsheet,
   ExternalLink, ImagePlus, Search, Globe, Eye, EyeOff,
-  Store, SlidersHorizontal, Image, Palette, Flame, Settings, Megaphone
+  Store, SlidersHorizontal, Image, Palette, Flame, Settings, Megaphone, Brain
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -31,10 +31,12 @@ import {
   getFilterConfig, updateFilterConfig,
   getAdminSlides, createSlide, updateSlide, deleteSlide,
   getHeroConfig, updateHeroConfig,
-  getTrendingConfig, updateTrendingConfig
+  getTrendingConfig, updateTrendingConfig,
+  aiGenerateDeal, aiGenerateDealsBulk
 } from '../lib/api';
 import { AdminSEO } from '../components/SEO';
 import AdminPopups from '../components/AdminPopups';
+import AdminAISettings from '../components/AdminAISettings';
 
 export default function AdminPage() {
   const { isAuthenticated, isAdmin, loading: authLoading } = useAuth();
@@ -231,6 +233,7 @@ export default function AdminPage() {
     { id: 'pages', label: 'Pages', icon: FileText },
     { id: 'blog', label: 'Blog Posts', icon: BookOpen },
     { id: 'popups', label: 'Popups', icon: Megaphone },
+    { id: 'ai_settings', label: 'AI Settings', icon: Brain },
   ];
 
   return (
@@ -619,6 +622,8 @@ export default function AdminPage() {
 
             {activeTab === 'popups' && <AdminPopups />}
 
+            {activeTab === 'ai_settings' && <AdminAISettings />}
+
           </AnimatePresence>
         </div>
       </div>
@@ -705,12 +710,20 @@ export default function AdminPage() {
 function CouponForm({ item, categories, onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiQuery, setAiQuery] = useState('');
+  const [showBulk, setShowBulk] = useState(false);
+  const [bulkQueries, setBulkQueries] = useState('');
+  const [bulkResults, setBulkResults] = useState([]);
+  const [bulkGenerating, setBulkGenerating] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(0);
 
   const [imageUrl, setImageUrl] = useState(item?.image_url || '');
   const [filePreview, setFilePreview] = useState(item?.image_url || null);
 
   const [form, setForm] = useState({
     title: item?.title || '',
+    description: item?.description || '',
     brand_name: item?.brand_name || '',
     category_name: item?.category_name ? item.category_name.split(",") : [],
     original_price: item?.original_price || '',
@@ -722,6 +735,86 @@ function CouponForm({ item, categories, onSuccess }) {
     verification_status: item?.verification_status || 'unverified',
     deal_score: item?.deal_score ?? ''
   });
+
+  // AI AUTO-FILL
+  const handleAIGenerate = async () => {
+    if (!aiQuery.trim()) { toast.error('Enter a product name'); return; }
+    setAiGenerating(true);
+    try {
+      const result = await aiGenerateDeal(aiQuery.trim());
+      if (result.success && result.deal) {
+        const d = result.deal;
+        setForm(prev => ({
+          ...prev,
+          title: d.title || prev.title,
+          description: d.description || prev.description,
+          brand_name: d.brand_name || prev.brand_name,
+          category_name: d.category_name ? [d.category_name] : prev.category_name,
+          original_price: d.original_price || prev.original_price,
+          discounted_price: d.discounted_price || prev.discounted_price,
+          offer_type: 'deal',
+          deal_score: d.discount_percentage ? Math.min(d.discount_percentage + 20, 100) : prev.deal_score
+        }));
+        toast.success('AI Auto-Fill complete! Review and edit fields below.');
+      } else {
+        toast.error(result.error || 'AI generation failed. Try again.');
+      }
+    } catch (err) {
+      toast.error('AI generation failed');
+    } finally {
+      setAiGenerating(false);
+    }
+  };
+
+  // BULK AI GENERATION
+  const handleBulkGenerate = async () => {
+    const queries = bulkQueries.split('\n').map(q => q.trim()).filter(Boolean);
+    if (queries.length === 0) { toast.error('Enter at least one product name'); return; }
+    setBulkGenerating(true);
+    setBulkProgress(0);
+    setBulkResults([]);
+    try {
+      const result = await aiGenerateDealsBulk(queries);
+      setBulkResults((result.results || []).map(r => ({ ...r, approved: r.success })));
+      setBulkProgress(100);
+      toast.success(`Generated ${result.results?.filter(r => r.success).length || 0}/${queries.length} deals`);
+    } catch {
+      toast.error('Bulk generation failed');
+    } finally {
+      setBulkGenerating(false);
+    }
+  };
+
+  const handleBulkPublish = async () => {
+    const approved = bulkResults.filter(r => r.approved && r.success);
+    if (approved.length === 0) { toast.error('No approved deals to publish'); return; }
+    setLoading(true);
+    let published = 0;
+    for (const r of approved) {
+      try {
+        const d = r.deal;
+        await createCoupon({
+          title: d.title,
+          description: d.description || '',
+          brand_name: d.brand_name || '',
+          category_name: d.category_name || '',
+          original_price: d.original_price ? parseInt(d.original_price) : null,
+          discounted_price: d.discounted_price ? parseInt(d.discounted_price) : null,
+          offer_type: 'deal',
+          is_active: true,
+          verification_status: 'unverified'
+        });
+        published++;
+      } catch {}
+    }
+    toast.success(`Published ${published} deals`);
+    setBulkResults([]);
+    setBulkQueries('');
+    setShowBulk(false);
+    setLoading(false);
+    onSuccess();
+  };
+
 
   // IMAGE UPLOAD
   const handleFileChange = async (e) => {
@@ -772,6 +865,7 @@ function CouponForm({ item, categories, onSuccess }) {
       const payload = {
         ...form,
         image_url: imageUrl || null,
+        description: form.description || '',
         category_name: form.category_name.join(","),
         offer_type: form.offer_type || null,
         original_price: form.original_price === '' ? null : parseInt(form.original_price, 10),
@@ -793,7 +887,115 @@ function CouponForm({ item, categories, onSuccess }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+    <form onSubmit={handleSubmit} className="space-y-4 pt-4 max-h-[70vh] overflow-y-auto pr-1">
+
+      {/* AI AUTO-FILL SECTION */}
+      {!item && (
+        <div className="bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-2xl p-4 space-y-3" data-testid="ai-autofill-section">
+          <div className="flex items-center gap-2">
+            <Brain className="w-5 h-5 text-[#ee922c]" />
+            <h3 className="font-bold text-sm text-gray-900">AI Auto-Fill</h3>
+            <button
+              type="button"
+              onClick={() => setShowBulk(!showBulk)}
+              className="ml-auto text-xs font-semibold text-[#ee922c] hover:underline"
+              data-testid="toggle-bulk-mode"
+            >
+              {showBulk ? 'Single Mode' : 'Bulk Mode'}
+            </button>
+          </div>
+
+          {!showBulk ? (
+            <div className="flex gap-2">
+              <Input
+                value={aiQuery}
+                onChange={e => setAiQuery(e.target.value)}
+                placeholder="Product name or search query (e.g. 'Sony WH-1000XM5')"
+                className="flex-1 bg-white"
+                data-testid="ai-query-input"
+              />
+              <Button
+                type="button"
+                onClick={handleAIGenerate}
+                disabled={aiGenerating}
+                className="bg-[#ee922c] hover:bg-[#d9811f] text-white whitespace-nowrap"
+                data-testid="ai-generate-btn"
+              >
+                {aiGenerating ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Brain className="w-4 h-4 mr-1" />}
+                {aiGenerating ? 'Generating...' : 'Generate'}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3" data-testid="bulk-generate-section">
+              <textarea
+                value={bulkQueries}
+                onChange={e => setBulkQueries(e.target.value)}
+                placeholder="Paste product names, one per line:&#10;Sony WH-1000XM5&#10;iPhone 15 case&#10;Nike Air Max 90"
+                className="w-full border rounded-xl p-3 text-sm min-h-[80px] bg-white resize-y focus:ring-2 focus:ring-[#ee922c]/30 outline-none"
+                data-testid="bulk-queries-input"
+              />
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  onClick={handleBulkGenerate}
+                  disabled={bulkGenerating}
+                  className="bg-[#ee922c] hover:bg-[#d9811f] text-white"
+                  data-testid="bulk-generate-btn"
+                >
+                  {bulkGenerating ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Brain className="w-4 h-4 mr-1" />}
+                  {bulkGenerating ? `Generating...` : 'Generate All'}
+                </Button>
+                {bulkResults.length > 0 && (
+                  <Button
+                    type="button"
+                    onClick={handleBulkPublish}
+                    disabled={loading}
+                    className="bg-[#3c7b48] hover:bg-[#2d6c3a] text-white"
+                    data-testid="bulk-publish-btn"
+                  >
+                    Publish Approved ({bulkResults.filter(r => r.approved && r.success).length})
+                  </Button>
+                )}
+              </div>
+
+              {/* Bulk results table */}
+              {bulkResults.length > 0 && (
+                <div className="space-y-2 max-h-[200px] overflow-y-auto" data-testid="bulk-results">
+                  {bulkResults.map((r, idx) => (
+                    <div key={idx} className={`flex items-center gap-3 p-2.5 rounded-xl border text-sm ${r.success ? 'bg-white' : 'bg-red-50 border-red-200'}`}>
+                      <input
+                        type="checkbox"
+                        checked={r.approved}
+                        onChange={() => {
+                          const updated = [...bulkResults];
+                          updated[idx] = { ...updated[idx], approved: !updated[idx].approved };
+                          setBulkResults(updated);
+                        }}
+                        className="rounded"
+                        disabled={!r.success}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <span className="font-semibold truncate block">
+                          {r.success ? r.deal.title : r.query}
+                        </span>
+                        {r.success && (
+                          <span className="text-xs text-gray-500">
+                            {r.deal.brand_name} · ₹{r.deal.discounted_price} · {r.deal.category_name}
+                          </span>
+                        )}
+                        {!r.success && <span className="text-xs text-red-500">{r.error}</span>}
+                      </div>
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${r.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                        {r.success ? 'OK' : 'Failed'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* IMAGE */}
       <div className="space-y-2">
@@ -836,7 +1038,20 @@ function CouponForm({ item, categories, onSuccess }) {
         value={form.title}
         onChange={(e) => setForm({ ...form, title: e.target.value })}
         required
+        data-testid="deal-title-input"
       />
+
+      {/* DESCRIPTION */}
+      <div className="space-y-1">
+        <Label className="text-sm">Description</Label>
+        <textarea
+          value={form.description || ''}
+          onChange={(e) => setForm({ ...form, description: e.target.value })}
+          placeholder="Deal description (AI-generated or manual)"
+          className="w-full border rounded-xl p-3 text-sm min-h-[60px] resize-y focus:ring-2 focus:ring-[#ee922c]/30 outline-none"
+          data-testid="deal-description-input"
+        />
+      </div>
 
       {/* OFFER TYPE - MULTI SELECT */}
       <div className="space-y-2">
