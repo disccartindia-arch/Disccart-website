@@ -19,6 +19,24 @@ export function DealCardSkeleton() {
   );
 }
 
+export function CompactDealCardSkeleton() {
+  return (
+    <div className="bg-white rounded-xl border border-gray-100 p-2.5 flex items-center gap-2.5 animate-pulse" data-testid="compact-deal-skeleton">
+      <div className="w-20 h-20 rounded-lg bg-gray-200 flex-shrink-0" />
+      <div className="flex-1 min-w-0 space-y-2">
+        <div className="h-2.5 w-12 bg-gray-200 rounded" />
+        <div className="h-3.5 w-full bg-gray-200 rounded" />
+        <div className="h-3.5 w-2/3 bg-gray-200 rounded" />
+        <div className="flex gap-2">
+          <div className="h-3 w-12 bg-gray-200 rounded" />
+          <div className="h-3 w-10 bg-gray-100 rounded" />
+        </div>
+      </div>
+      <div className="w-14 h-11 rounded-lg bg-gray-200 flex-shrink-0" />
+    </div>
+  );
+}
+
 export function StoreCardSkeleton() {
   return (
     <div className="bg-white border border-gray-100 rounded-2xl p-4 flex flex-col items-center animate-pulse" data-testid="store-card-skeleton">

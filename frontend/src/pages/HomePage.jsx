@@ -4,10 +4,11 @@ import { TrendingUp, Zap, ArrowRight, Tag, Clock, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { getCoupons, getCategories, getHeroConfig } from '../lib/api';
 import DealCard from '../components/DealCard';
+import CompactDealCard from '../components/CompactDealCard';
 import CategoryPills from '../components/CategoryPills';
 import HeroSlider from '../components/HeroSlider';
 import { HomeSEO } from '../components/SEO';
-import { DealCardSkeleton, CategoryCardSkeleton } from '../components/Skeletons';
+import { DealCardSkeleton, CompactDealCardSkeleton, CategoryCardSkeleton } from '../components/Skeletons';
 import FilterDrawer from '../components/FilterDrawer';
 
 const DEALS_PER_PAGE = 12;
@@ -170,8 +171,11 @@ export default function HomePage() {
                 <Zap className="w-6 h-6 text-[#ee922c]" />
                 <h2 className="font-display font-bold text-2xl text-gray-900">Featured Deals</h2>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {[...Array(4)].map((_, i) => <DealCardSkeleton key={i} />)}
+              </div>
+              <div className="md:hidden space-y-2">
+                {[...Array(4)].map((_, i) => <CompactDealCardSkeleton key={i} />)}
               </div>
             </>
           ) : featuredDeals.length > 0 ? (
@@ -181,13 +185,20 @@ export default function HomePage() {
                   <Zap className="w-6 h-6 text-[#ee922c]" />
                   <h2 className="font-display font-bold text-2xl text-gray-900">Featured Deals</h2>
                 </div>
-                <Link to="/trending" className="text-[#ee922c] font-medium flex items-center gap-1 hover:gap-2 transition-all">
+                <Link to="/deals" className="text-[#ee922c] font-medium flex items-center gap-1 hover:gap-2 transition-all">
                   View All <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {/* Desktop: grid */}
+              <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-4 gap-6">
                 {featuredDeals.map((deal) => (
                   <DealCard key={deal.id} deal={deal} />
+                ))}
+              </div>
+              {/* Mobile: compact list */}
+              <div className="md:hidden space-y-2">
+                {featuredDeals.map((deal) => (
+                  <CompactDealCard key={deal.id} deal={deal} />
                 ))}
               </div>
             </>
@@ -249,15 +260,27 @@ export default function HomePage() {
               </Link>
             </div>
             {limitedLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[...Array(3)].map((_, i) => <DealCardSkeleton key={i} />)}
-              </div>
+              <>
+                <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {[...Array(3)].map((_, i) => <DealCardSkeleton key={i} />)}
+                </div>
+                <div className="md:hidden space-y-2">
+                  {[...Array(3)].map((_, i) => <CompactDealCardSkeleton key={i} />)}
+                </div>
+              </>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {limitedDeals.slice(0, 6).map((deal) => (
-                  <DealCard key={deal.id} deal={deal} />
-                ))}
-              </div>
+              <>
+                <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {limitedDeals.slice(0, 6).map((deal) => (
+                    <DealCard key={deal.id} deal={deal} />
+                  ))}
+                </div>
+                <div className="md:hidden space-y-2">
+                  {limitedDeals.slice(0, 6).map((deal) => (
+                    <CompactDealCard key={deal.id} deal={deal} />
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </section>
@@ -271,20 +294,36 @@ export default function HomePage() {
               <TrendingUp className="w-6 h-6 text-[#3c7b48]" />
               <h2 className="font-display font-bold text-2xl text-gray-900">Trending Now</h2>
             </div>
-            <Link to="/trending" className="text-[#ee922c] font-medium flex items-center gap-1 hover:gap-2 transition-all">
+            <Link to="/deals" className="text-[#ee922c] font-medium flex items-center gap-1 hover:gap-2 transition-all">
               See All <ArrowRight className="w-4 h-4" />
             </Link>
           </div>
           {trendingLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {[...Array(8)].map((_, i) => <DealCardSkeleton key={i} />)}
-            </div>
+            <>
+              {/* Mobile: compact skeletons */}
+              <div className="md:hidden space-y-2">
+                {[...Array(6)].map((_, i) => <CompactDealCardSkeleton key={i} />)}
+              </div>
+              {/* Desktop: grid skeletons */}
+              <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {[...Array(8)].map((_, i) => <DealCardSkeleton key={i} />)}
+              </div>
+            </>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {trendingDeals.map((deal) => (
-                <DealCard key={deal.id} deal={deal} />
-              ))}
-            </div>
+            <>
+              {/* Mobile: compact card list */}
+              <div className="md:hidden space-y-2">
+                {trendingDeals.map((deal) => (
+                  <CompactDealCard key={deal.id} deal={deal} />
+                ))}
+              </div>
+              {/* Desktop: full card grid */}
+              <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {trendingDeals.map((deal) => (
+                  <DealCard key={deal.id} deal={deal} />
+                ))}
+              </div>
+            </>
           )}
 
           {!trendingLoading && hasMore && (

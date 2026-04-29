@@ -932,11 +932,21 @@ async def get_filtered_deals(
     min_discount: Optional[int] = None,
     max_discount: Optional[int] = None,
     deal_type: Optional[str] = None,
+    search: Optional[str] = None,
     limit: int = 50,
     skip: int = 0,
     sort_by: Optional[str] = None
 ):
     match_stage = {"is_active": True}
+
+    if search and search.strip():
+        search_regex = {"$regex": search.strip(), "$options": "i"}
+        match_stage["$or"] = [
+            {"title": search_regex},
+            {"brand_name": search_regex},
+            {"description": search_regex},
+            {"category_name": search_regex}
+        ]
 
     if category and category not in ["All", "undefined", "null"]:
         match_stage["category_name"] = {"$regex": category, "$options": "i"}
@@ -957,10 +967,17 @@ async def get_filtered_deals(
             price_cond["$gte"] = min_price
         if max_price is not None:
             price_cond["$lte"] = max_price
-        match_stage["$or"] = [
+        price_or = [
             {"discounted_price": price_cond},
             {"discounted_price": {"$in": [None, 0]}, "original_price": price_cond}
         ]
+        # If $or already exists (from search), use $and to combine
+        if "$or" in match_stage:
+            match_stage.setdefault("$and", [])
+            match_stage["$and"].append({"$or": match_stage.pop("$or")})
+            match_stage["$and"].append({"$or": price_or})
+        else:
+            match_stage["$or"] = price_or
 
     # Discount percentage filtering
     if min_discount is not None or max_discount is not None:
