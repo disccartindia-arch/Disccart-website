@@ -1437,7 +1437,12 @@ async def ai_chat(request: Request):
 
     api_key = os.environ.get("EMERGENT_LLM_KEY")
     if not api_key:
-        raise HTTPException(500, "AI service not configured")
+        return {
+            "reply": "AI service is not configured. The EMERGENT_LLM_KEY environment variable is missing from your deployment. Please add it in your hosting platform settings.",
+            "products": [],
+            "keywords": [],
+            "error": "EMERGENT_LLM_KEY not set"
+        }
 
     keywords = extract_keywords(message)
     products = await search_products_for_ai(keywords, limit=8)
@@ -1564,7 +1569,16 @@ async def ai_chat(request: Request):
 
     except Exception as e:
         logger.error(f"AI chat error: {e}")
-        fallback_reply = "I'm having trouble connecting right now. "
+        error_hint = ""
+        error_str = str(e).lower()
+        if "api key" in error_str or "authentication" in error_str or "unauthorized" in error_str:
+            error_hint = "AI service key may be invalid or expired. "
+        elif "budget" in error_str or "quota" in error_str or "rate" in error_str or "limit" in error_str:
+            error_hint = "AI service budget limit reached. "
+        elif "timeout" in error_str or "connect" in error_str:
+            error_hint = "AI service connection timeout. "
+
+        fallback_reply = f"Sorry, I'm having trouble right now. {error_hint}"
         if products:
             fallback_reply += f"But I found {len(products)} deals matching your search! Check them out below."
         else:
@@ -1582,7 +1596,7 @@ async def ai_chat(request: Request):
                 "image_url": p.get("image_url"),
             })
 
-        return {"reply": fallback_reply, "products": product_cards, "keywords": keywords[:5]}
+        return {"reply": fallback_reply, "products": product_cards, "keywords": keywords[:5], "error": str(e)[:150]}
 
 
 # ===================== ENHANCED SEARCH =====================
@@ -1738,6 +1752,18 @@ async def search_suggestions(q: str = ""):
 
 # ===================== AI DEAL GENERATION =====================
 
+@api_router.get("/ai/status")
+async def ai_status():
+    """Check if AI services are configured — useful for debugging production issues."""
+    key = os.environ.get("EMERGENT_LLM_KEY")
+    return {
+        "ai_configured": bool(key),
+        "key_prefix": key[:12] + "..." if key else None,
+        "hint": "Set EMERGENT_LLM_KEY in your deployment environment variables" if not key else "AI key configured"
+    }
+
+
+
 @api_router.post("/ai/generate-deal")
 async def ai_generate_deal(request: Request):
     await admin_required(request)
@@ -1748,7 +1774,7 @@ async def ai_generate_deal(request: Request):
 
     api_key = os.environ.get("EMERGENT_LLM_KEY")
     if not api_key:
-        raise HTTPException(500, "AI service not configured")
+        return {"success": False, "error": "EMERGENT_LLM_KEY not configured. Add it to your deployment environment variables."}
 
     prompt = f"""You are a deal content generator for DISCCART.IN, an Indian deals platform.
 Given the product query: "{product_query}"
@@ -1822,7 +1848,7 @@ async def ai_generate_deals_bulk(request: Request):
 
     api_key = os.environ.get("EMERGENT_LLM_KEY")
     if not api_key:
-        raise HTTPException(500, "AI service not configured")
+        return {"results": [{"query": q, "success": False, "error": "EMERGENT_LLM_KEY not configured"} for q in queries[:20]]}
 
     results = []
     for q in queries[:20]:  # Max 20 at a time

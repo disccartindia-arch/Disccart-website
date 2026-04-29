@@ -114,10 +114,14 @@ export default function AIChatWidget() {
         text: res.reply || "I found some deals for you!",
         products: res.products || []
       }]);
-    } catch {
+    } catch (err) {
+      const detail = err?.response?.data?.detail || '';
+      const errorMsg = detail.includes('not configured')
+        ? "AI service is not configured on this server. Ask the admin to set EMERGENT_LLM_KEY."
+        : "Sorry, I'm having trouble right now. Try browsing our deals page or searching above!";
       setMessages(prev => [...prev, {
         role: 'bot',
-        text: "Sorry, I'm having trouble right now. Try browsing our deals page or searching above!",
+        text: errorMsg,
         products: []
       }]);
     } finally {

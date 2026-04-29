@@ -45,6 +45,14 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
   - Chatbot now reads AI settings dynamically for personality, tone, templates
   - Description field added to deal form
   - Schema-ready: membership_tier field architecture for users/deals (payment flow is future scope)
+- Phase 25b: AI Error Handling + Image Uploads (April 29, 2026)
+  - FIXED: DealBot fallback now shows specific error cause (missing key / budget / timeout) instead of generic message
+  - FIXED: AI Auto-Fill shows actual backend error message instead of generic "AI generation failed"
+  - Added: GET /api/ai/status endpoint — diagnose if AI key is configured on production
+  - Backend no longer throws HTTP 500 when EMERGENT_LLM_KEY is missing — returns user-friendly error in response
+  - Category Form: Cloudinary image upload (drag/drop + URL fallback)
+  - Blog Form: Cloudinary cover image upload
+  - NOTE: Production site (disccart.in) needs EMERGENT_LLM_KEY set in Render environment variables
 
 ## Key API Endpoints
 - POST /api/auth/login, POST /api/auth/register, GET /api/auth/me

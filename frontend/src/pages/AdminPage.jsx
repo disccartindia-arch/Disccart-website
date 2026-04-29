@@ -760,7 +760,8 @@ function CouponForm({ item, categories, onSuccess }) {
         toast.error(result.error || 'AI generation failed. Try again.');
       }
     } catch (err) {
-      toast.error('AI generation failed');
+      const msg = err?.response?.data?.detail || err?.message || 'AI generation failed';
+      toast.error(msg.includes('not configured') ? 'AI key not set. Add EMERGENT_LLM_KEY to deployment env.' : `AI error: ${msg}`);
     } finally {
       setAiGenerating(false);
     }
@@ -1212,8 +1213,22 @@ function CouponForm({ item, categories, onSuccess }) {
 
 function CategoryForm({ item, onSuccess }) {
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [name, setName] = useState(item?.name || '');
   const [bgUrl, setBgUrl] = useState(item?.background_image_url || '');
+
+  const handleImageUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await uploadImage(file);
+      setBgUrl(url);
+      toast.success('Image uploaded');
+    } catch { toast.error('Upload failed'); }
+    finally { setUploading(false); }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -1225,10 +1240,28 @@ function CategoryForm({ item, onSuccess }) {
     } catch { toast.error("Failed to save"); } finally { setLoading(false); }
   };
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-      <Input placeholder="Category Name" value={name} onChange={e => setName(e.target.value)} required />
-      <Input placeholder="Image URL (Optional)" value={bgUrl} onChange={e => setBgUrl(e.target.value)} />
-      <Button type="submit" className="w-full h-12" disabled={loading}>Confirm</Button>
+    <form onSubmit={handleSubmit} className="space-y-4 pt-4" data-testid="category-form">
+      <Input placeholder="Category Name" value={name} onChange={e => setName(e.target.value)} required data-testid="category-name-input" />
+      <div className="space-y-2">
+        <Label className="text-sm font-bold">Category Image</Label>
+        {bgUrl && (
+          <div className="relative w-full h-32 rounded-xl overflow-hidden border bg-gray-50">
+            <img src={bgUrl} alt="" className="w-full h-full object-cover" />
+            <button type="button" onClick={() => setBgUrl('')} className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full"><X size={14} /></button>
+          </div>
+        )}
+        {!bgUrl && (
+          <label className="flex items-center gap-2 border-2 border-dashed rounded-xl p-4 cursor-pointer hover:bg-gray-50 transition-colors">
+            <ImagePlus className="w-5 h-5 text-gray-400" />
+            <span className="text-sm text-gray-500">{uploading ? 'Uploading...' : 'Upload category image'}</span>
+            <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={uploading} />
+          </label>
+        )}
+        <Input placeholder="Or paste image URL" value={bgUrl} onChange={e => setBgUrl(e.target.value)} className="text-xs" />
+      </div>
+      <Button type="submit" className="w-full h-12" disabled={loading || uploading} data-testid="category-save-btn">
+        {loading ? <Loader2 className="animate-spin" /> : 'Save Category'}
+      </Button>
     </form>
   );
 }
@@ -1278,7 +1311,26 @@ function PageForm({ item, onSuccess }) {
 
 function BlogForm({ item, onSuccess }) {
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState(item || { title: '', content: '', published: true });
+  const [uploading, setUploading] = useState(false);
+  const [form, setForm] = useState({
+    title: item?.title || '',
+    content: item?.content || '',
+    cover_image: item?.cover_image || '',
+    published: item?.published ?? true
+  });
+
+  const handleCoverUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await uploadImage(file);
+      setForm(prev => ({ ...prev, cover_image: url }));
+      toast.success('Cover image uploaded');
+    } catch { toast.error('Upload failed'); }
+    finally { setUploading(false); }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -1289,14 +1341,35 @@ function BlogForm({ item, onSuccess }) {
     } catch { toast.error("Failed"); } finally { setLoading(false); }
   };
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 pt-4">
-      <Input placeholder="Post Title" value={form.title} onChange={e => setForm({...form, title: e.target.value})} required />
-      <Textarea placeholder="Content" value={form.content} onChange={e => setForm({...form, content: e.target.value})} />
+    <form onSubmit={handleSubmit} className="space-y-4 pt-4" data-testid="blog-form">
+      <Input placeholder="Post Title" value={form.title} onChange={e => setForm({...form, title: e.target.value})} required data-testid="blog-title-input" />
+
+      {/* Cover Image */}
+      <div className="space-y-2">
+        <Label className="text-sm font-bold">Cover Image</Label>
+        {form.cover_image && (
+          <div className="relative w-full h-32 rounded-xl overflow-hidden border bg-gray-50">
+            <img src={form.cover_image} alt="" className="w-full h-full object-cover" />
+            <button type="button" onClick={() => setForm({...form, cover_image: ''})} className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full"><X size={14} /></button>
+          </div>
+        )}
+        {!form.cover_image && (
+          <label className="flex items-center gap-2 border-2 border-dashed rounded-xl p-3 cursor-pointer hover:bg-gray-50 transition-colors">
+            <ImagePlus className="w-5 h-5 text-gray-400" />
+            <span className="text-sm text-gray-500">{uploading ? 'Uploading...' : 'Upload cover image'}</span>
+            <input type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} disabled={uploading} />
+          </label>
+        )}
+      </div>
+
+      <Textarea placeholder="Content" value={form.content} onChange={e => setForm({...form, content: e.target.value})} className="min-h-[120px]" data-testid="blog-content-input" />
       <div className="flex items-center gap-2">
-         <input type="checkbox" checked={form.published} onChange={e => setForm({...form, published: e.target.checked})} />
+         <input type="checkbox" checked={form.published} onChange={e => setForm({...form, published: e.target.checked})} className="rounded" />
          <Label>Published</Label>
       </div>
-      <Button type="submit" className="w-full" disabled={loading}>Save Post</Button>
+      <Button type="submit" className="w-full h-12" disabled={loading || uploading} data-testid="blog-save-btn">
+        {loading ? <Loader2 className="animate-spin" /> : 'Save Post'}
+      </Button>
     </form>
   );
 }
