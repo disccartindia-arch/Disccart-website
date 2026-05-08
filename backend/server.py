@@ -1912,6 +1912,242 @@ async def update_ai_settings(request: Request):
     return {"status": "saved"}
 
 
+# ===================== DEAL ENGINE ENDPOINTS =====================
+from deal_engine import extract_product, generate_caption, tag_affiliate_url, detect_platform, send_telegram
+
+@api_router.post("/deal-engine/extract")
+async def deal_engine_extract(request: Request):
+    """Extract product metadata from Amazon/Flipkart URL."""
+    await admin_required(request)
+    body = await request.json()
+    url = body.get("url", "").strip()
+    if not url:
+        raise HTTPException(400, "URL is required")
+
+    product = await extract_product(url)
+
+    # Auto-tag affiliate link
+    settings = await db.site_settings.find_one({"_id": "deal_engine"}) or {}
+    platform = detect_platform(url)
+    affiliate_url = tag_affiliate_url(url, platform, settings)
+    product["affiliate_url"] = affiliate_url
+
+    return {"success": True, "product": product}
+
+
+@api_router.post("/deal-engine/caption")
+async def deal_engine_caption(request: Request):
+    """Generate AI caption from product data."""
+    await admin_required(request)
+    body = await request.json()
+    product = body.get("product", {})
+    if not product.get("title"):
+        raise HTTPException(400, "Product data with title is required")
+
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    if not api_key:
+        return {"success": False, "error": "EMERGENT_LLM_KEY not configured"}
+
+    caption_data = await generate_caption(product, api_key)
+    return {"success": True, "captions": caption_data}
+
+
+@api_router.post("/deal-engine/publish-telegram")
+async def deal_engine_publish_telegram(request: Request):
+    """Publish deal to Telegram channel."""
+    await admin_required(request)
+    body = await request.json()
+
+    settings = await db.site_settings.find_one({"_id": "deal_engine"}) or {}
+    bot_token = settings.get("telegram_bot_token", "")
+    channel_id = settings.get("telegram_channel_id", "")
+
+    caption = body.get("caption", "")
+    image_url = body.get("image_url", "")
+    affiliate_url = body.get("affiliate_url", "")
+    deal_id = body.get("deal_id")
+
+    result = await send_telegram(bot_token, channel_id, caption, image_url, affiliate_url)
+
+    # Track in analytics
+    if result.get("success") and deal_id:
+        await db.deal_engine_analytics.update_one(
+            {"deal_id": deal_id},
+            {"$set": {"telegram_sent": True, "telegram_sent_at": datetime.now(timezone.utc)},
+             "$inc": {"telegram_count": 1}},
+            upsert=True
+        )
+        # Increment global telegram count
+        await db.deal_engine_analytics.update_one(
+            {"_id": "global_stats"},
+            {"$inc": {"total_telegram_posts": 1}},
+            upsert=True
+        )
+
+    return result
+
+
+@api_router.post("/deal-engine/publish-website")
+async def deal_engine_publish_website(request: Request):
+    """Publish deal to Disccart website (creates a coupon entry)."""
+    await admin_required(request)
+    body = await request.json()
+
+    title = body.get("title", "").strip()
+    if not title:
+        raise HTTPException(400, "Title is required")
+
+    # Generate slug
+    slug = re.sub(r'[^a-z0-9\s-]', '', title.lower())
+    slug = re.sub(r'[\s-]+', '-', slug)[:80]
+
+    doc = {
+        "title": title,
+        "description": body.get("description", ""),
+        "brand_name": body.get("brand_name", ""),
+        "category_name": body.get("category_name", ""),
+        "code": body.get("code", ""),
+        "affiliate_url": body.get("affiliate_url", ""),
+        "image_url": body.get("image_url", ""),
+        "original_price": body.get("original_price"),
+        "discounted_price": body.get("discounted_price"),
+        "discount_type": "percentage",
+        "discount_value": body.get("discount_pct", 0),
+        "offer_type": body.get("offer_type", "deal"),
+        "is_active": True,
+        "slug": slug,
+        "source_platform": body.get("platform", ""),
+        "source_url": body.get("source_url", ""),
+        "deal_engine_generated": True,
+        "verification_status": "verified",
+        "deal_score": min(body.get("discount_pct", 50) + 20, 100),
+        "status": body.get("status", "published"),
+        "created_at": datetime.now(timezone.utc),
+    }
+
+    # Handle scheduling
+    scheduled_at = body.get("scheduled_at")
+    if scheduled_at:
+        doc["status"] = "scheduled"
+        doc["scheduled_at"] = scheduled_at
+        doc["is_active"] = False
+
+    result = await db.coupons.insert_one(doc)
+    deal_id = str(result.inserted_id)
+    cache.invalidate("coupons", "deals", "trending", "categories")
+
+    # Track analytics
+    await db.deal_engine_analytics.update_one(
+        {"_id": "global_stats"},
+        {"$inc": {"total_deals_posted": 1}},
+        upsert=True
+    )
+
+    return {"success": True, "deal_id": deal_id, "slug": slug}
+
+
+@api_router.get("/deal-engine/deals")
+async def deal_engine_deals(request: Request, status: str = None, limit: int = 50, skip: int = 0):
+    """Get deals created via deal engine with optional status filter."""
+    await admin_required(request)
+    query = {"deal_engine_generated": True}
+    if status:
+        query["status"] = status
+
+    deals = []
+    cursor = db.coupons.find(query, {"_id": 1, "title": 1, "image_url": 1, "affiliate_url": 1,
+                                      "original_price": 1, "discounted_price": 1, "discount_value": 1,
+                                      "status": 1, "source_platform": 1, "created_at": 1, "is_active": 1,
+                                      "slug": 1, "category_name": 1, "brand_name": 1})
+    cursor = cursor.sort("created_at", -1).skip(skip).limit(limit)
+    async for doc in cursor:
+        doc["id"] = str(doc.pop("_id"))
+        deals.append(doc)
+
+    total = await db.coupons.count_documents(query)
+    return {"deals": deals, "total": total}
+
+
+@api_router.patch("/deal-engine/deals/{deal_id}/status")
+async def deal_engine_update_status(deal_id: str, request: Request):
+    """Update deal status (draft/scheduled/published)."""
+    await admin_required(request)
+    body = await request.json()
+    new_status = body.get("status", "")
+    if new_status not in ["draft", "scheduled", "published"]:
+        raise HTTPException(400, "Invalid status")
+
+    update = {"status": new_status}
+    if new_status == "published":
+        update["is_active"] = True
+    elif new_status == "draft":
+        update["is_active"] = False
+
+    await db.coupons.update_one({"_id": ObjectId(deal_id)}, {"$set": update})
+    cache.invalidate("coupons", "deals")
+    return {"success": True}
+
+
+@api_router.get("/deal-engine/analytics")
+async def deal_engine_analytics(request: Request):
+    """Get deal engine analytics."""
+    await admin_required(request)
+    stats = await db.deal_engine_analytics.find_one({"_id": "global_stats"}) or {}
+    stats.pop("_id", None)
+
+    total_engine = await db.coupons.count_documents({"deal_engine_generated": True})
+    published = await db.coupons.count_documents({"deal_engine_generated": True, "status": "published"})
+    drafts = await db.coupons.count_documents({"deal_engine_generated": True, "status": "draft"})
+    scheduled = await db.coupons.count_documents({"deal_engine_generated": True, "status": "scheduled"})
+
+    # Top clicked deals (from clicks collection)
+    top_clicked = []
+    pipeline = [
+        {"$match": {}},
+        {"$group": {"_id": "$coupon_id", "clicks": {"$sum": 1}}},
+        {"$sort": {"clicks": -1}},
+        {"$limit": 5}
+    ]
+    async for doc in db.clicks.aggregate(pipeline):
+        if doc["_id"]:
+            top_clicked.append({"deal_id": doc["_id"], "clicks": doc["clicks"]})
+
+    return {
+        "total_deals_posted": stats.get("total_deals_posted", total_engine),
+        "total_telegram_posts": stats.get("total_telegram_posts", 0),
+        "published": published,
+        "drafts": drafts,
+        "scheduled": scheduled,
+        "top_clicked": top_clicked,
+    }
+
+
+@api_router.get("/deal-engine/settings")
+async def deal_engine_settings(request: Request):
+    """Get deal engine settings."""
+    await admin_required(request)
+    settings = await db.site_settings.find_one({"_id": "deal_engine"}) or {}
+    settings.pop("_id", None)
+    # Mask sensitive values
+    if settings.get("telegram_bot_token"):
+        settings["telegram_bot_token_masked"] = settings["telegram_bot_token"][:8] + "..."
+    return settings
+
+
+@api_router.patch("/deal-engine/settings")
+async def update_deal_engine_settings(request: Request):
+    """Update deal engine settings."""
+    await admin_required(request)
+    body = await request.json()
+    body.pop("_id", None)
+    await db.site_settings.update_one(
+        {"_id": "deal_engine"},
+        {"$set": body},
+        upsert=True
+    )
+    return {"status": "saved"}
+
+
 app.include_router(api_router, prefix="/api")
 
 os.makedirs("uploads", exist_ok=True)

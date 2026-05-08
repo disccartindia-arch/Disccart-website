@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Tag, Upload, Link2, FileText, BookOpen,
   Plus, Pencil, Trash2, X, Loader2, FileSpreadsheet,
   ExternalLink, ImagePlus, Search, Globe, Eye, EyeOff,
-  Store, SlidersHorizontal, Image, Palette, Flame, Settings, Megaphone, Brain
+  Store, SlidersHorizontal, Image, Palette, Flame, Settings, Megaphone, Brain, Rocket
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -37,6 +37,7 @@ import {
 import { AdminSEO } from '../components/SEO';
 import AdminPopups from '../components/AdminPopups';
 import AdminAISettings from '../components/AdminAISettings';
+import AdminDealEngine from '../components/AdminDealEngine';
 
 export default function AdminPage() {
   const { isAuthenticated, isAdmin, loading: authLoading } = useAuth();
@@ -221,6 +222,7 @@ export default function AdminPage() {
 
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'deal_engine', label: 'Deal Engine', icon: Rocket },
     { id: 'coupons', label: 'Deals & Coupons', icon: Tag },
     { id: 'categories', label: 'Categories', icon: Plus },
     { id: 'stores', label: 'Stores', icon: Store },
@@ -623,6 +625,8 @@ export default function AdminPage() {
             {activeTab === 'popups' && <AdminPopups />}
 
             {activeTab === 'ai_settings' && <AdminAISettings />}
+
+            {activeTab === 'deal_engine' && <AdminDealEngine />}
 
           </AnimatePresence>
         </div>
