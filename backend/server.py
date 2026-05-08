@@ -1913,7 +1913,7 @@ async def update_ai_settings(request: Request):
 
 
 # ===================== DEAL ENGINE ENDPOINTS =====================
-from deal_engine import extract_product, generate_caption, tag_affiliate_url, detect_platform, send_telegram
+from deal_engine import extract_product, generate_caption, tag_affiliate_url, detect_platform, send_telegram, test_telegram_connection
 
 @api_router.post("/deal-engine/extract")
 async def deal_engine_extract(request: Request):
@@ -1924,7 +1924,8 @@ async def deal_engine_extract(request: Request):
     if not url:
         raise HTTPException(400, "URL is required")
 
-    product = await extract_product(url)
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    product = await extract_product(url, api_key)
 
     # Auto-tag affiliate link
     settings = await db.site_settings.find_one({"_id": "deal_engine"}) or {}
@@ -2155,6 +2156,72 @@ async def update_deal_engine_settings(request: Request):
         upsert=True
     )
     return {"status": "saved"}
+
+
+@api_router.post("/deal-engine/test-telegram")
+async def deal_engine_test_telegram(request: Request):
+    """Test Telegram bot connection."""
+    await admin_required(request)
+    body = await request.json()
+    bot_token = body.get("bot_token", "")
+    channel_id = body.get("channel_id", "")
+
+    # If not provided in body, read from saved settings
+    if not bot_token or not channel_id:
+        settings = await db.site_settings.find_one({"_id": "deal_engine"}) or {}
+        if not bot_token:
+            bot_token = settings.get("telegram_bot_token", "")
+        if not channel_id:
+            channel_id = settings.get("telegram_channel_id", "")
+
+    result = await test_telegram_connection(bot_token, channel_id)
+    return result
+
+
+@api_router.post("/deal-engine/queue")
+async def deal_engine_queue(request: Request):
+    """Process multiple URLs in batch — the Deal Queue."""
+    await admin_required(request)
+    body = await request.json()
+    urls = body.get("urls", [])
+    if not urls or not isinstance(urls, list):
+        raise HTTPException(400, "urls array required")
+
+    api_key = os.environ.get("EMERGENT_LLM_KEY")
+    settings = await db.site_settings.find_one({"_id": "deal_engine"}) or {}
+
+    results = []
+    for url in urls[:15]:  # Max 15 at a time
+        url = url.strip()
+        if not url:
+            continue
+        try:
+            product = await extract_product(url, api_key)
+            platform = detect_platform(url)
+            affiliate_url = tag_affiliate_url(url, platform, settings)
+            product["affiliate_url"] = affiliate_url
+
+            # Also generate caption
+            caption_data = {}
+            if product.get("title") and api_key:
+                caption_data = await generate_caption(product, api_key)
+
+            results.append({
+                "url": url,
+                "success": bool(product.get("title")),
+                "product": product,
+                "captions": caption_data,
+                "approved": bool(product.get("title")),
+            })
+        except Exception as e:
+            results.append({
+                "url": url,
+                "success": False,
+                "error": str(e)[:100],
+                "approved": False,
+            })
+
+    return {"results": results, "total": len(results)}
 
 
 app.include_router(api_router, prefix="/api")

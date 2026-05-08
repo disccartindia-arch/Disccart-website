@@ -24,6 +24,8 @@ const deApi = {
   getAnalytics: () => api.get('/deal-engine/analytics').then(r => r.data),
   getSettings: () => api.get('/deal-engine/settings').then(r => r.data),
   saveSettings: (data) => api.patch('/deal-engine/settings', data).then(r => r.data),
+  testTelegram: (data) => api.post('/deal-engine/test-telegram', data).then(r => r.data),
+  queue: (urls) => api.post('/deal-engine/queue', { urls }).then(r => r.data),
 };
 
 // ===================== MAIN COMPONENT =====================
@@ -33,7 +35,8 @@ export default function AdminDealEngine() {
 
   const views = [
     { id: 'create', label: 'Create Deal', icon: Rocket },
-    { id: 'deals', label: 'My Deals', icon: FileText },
+    { id: 'queue', label: 'Deal Queue', icon: FileText },
+    { id: 'deals', label: 'My Deals', icon: Eye },
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
@@ -69,6 +72,7 @@ export default function AdminDealEngine() {
 
       <div className="bg-gray-50 rounded-2xl border min-h-[400px]">
         {activeView === 'create' && <CreateDealView />}
+        {activeView === 'queue' && <DealQueueView />}
         {activeView === 'deals' && <DealsListView />}
         {activeView === 'analytics' && <AnalyticsView />}
         {activeView === 'settings' && <SettingsView />}
@@ -680,7 +684,237 @@ function SettingsView() {
           <Input value={settings.telegram_channel_id} onChange={e => setSettings({...settings, telegram_channel_id: e.target.value})} placeholder="@yourchannel or -100123..." data-testid="de-tg-channel" />
         </div>
         <p className="text-[10px] text-gray-400">Get your bot token from @BotFather on Telegram. Channel ID is your channel username (e.g., @disccartdeals) or numeric ID.</p>
+        <TelegramTestButton token={settings.telegram_bot_token} channelId={settings.telegram_channel_id} />
       </div>
+    </div>
+  );
+}
+
+// ===================== TELEGRAM TEST BUTTON =====================
+
+function TelegramTestButton({ token, channelId }) {
+  const [testing, setTesting] = useState(false);
+  const [result, setResult] = useState(null);
+
+  const handleTest = async () => {
+    setTesting(true);
+    setResult(null);
+    try {
+      const res = await deApi.testTelegram({ bot_token: token, channel_id: channelId });
+      setResult(res);
+      if (res.success) {
+        toast.success(`Connected! Bot: @${res.bot_name} → ${res.channel_name}`);
+      } else {
+        toast.error(res.error || 'Connection failed');
+      }
+    } catch {
+      toast.error('Test failed — check your credentials');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  return (
+    <div className="pt-2 space-y-2" data-testid="tg-test-section">
+      <Button onClick={handleTest} disabled={testing} variant="outline" size="sm" className="w-full" data-testid="tg-test-btn">
+        {testing ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Send className="w-4 h-4 mr-1" />}
+        {testing ? 'Testing...' : 'Test Telegram Connection'}
+      </Button>
+      {result && (
+        <div className={`text-xs p-2 rounded-lg ${result.success ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+          {result.success ? (
+            <span>Connected to <strong>{result.channel_name}</strong> via @{result.bot_name}</span>
+          ) : (
+            <span>{result.error}</span>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===================== DEAL QUEUE VIEW =====================
+
+function DealQueueView() {
+  const [urlsText, setUrlsText] = useState('');
+  const [processing, setProcessing] = useState(false);
+  const [results, setResults] = useState([]);
+  const [publishing, setPublishing] = useState(false);
+  const [publishProgress, setPublishProgress] = useState(0);
+
+  const handleProcessQueue = async () => {
+    const urls = urlsText.split('\n').map(u => u.trim()).filter(u => u.startsWith('http'));
+    if (urls.length === 0) { toast.error('Paste at least one valid URL'); return; }
+    setProcessing(true);
+    setResults([]);
+    try {
+      const res = await deApi.queue(urls);
+      setResults(res.results || []);
+      const ok = (res.results || []).filter(r => r.success).length;
+      toast.success(`Processed ${ok}/${urls.length} deals`);
+    } catch {
+      toast.error('Queue processing failed');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const toggleApproval = (idx) => {
+    setResults(prev => prev.map((r, i) => i === idx ? { ...r, approved: !r.approved } : r));
+  };
+
+  const handleBulkPublish = async (includeTelegram = false) => {
+    const approved = results.filter(r => r.approved && r.success);
+    if (approved.length === 0) { toast.error('No approved deals'); return; }
+    setPublishing(true);
+    setPublishProgress(0);
+    let done = 0;
+    for (const item of approved) {
+      try {
+        const p = item.product || {};
+        const res = await deApi.publishWebsite({
+          title: item.captions?.seo_title || p.title || 'Untitled Deal',
+          description: item.captions?.website_description || '',
+          brand_name: p.title?.split(' ')[0] || '',
+          category_name: p.category || '',
+          original_price: p.original_price || null,
+          discounted_price: p.current_price || null,
+          discount_pct: p.discount_pct || 0,
+          image_url: p.image_url || '',
+          affiliate_url: p.affiliate_url || '',
+          source_url: p.source_url || '',
+          platform: p.platform || '',
+          status: 'published',
+        });
+
+        if (res.success && includeTelegram && item.captions?.telegram_caption) {
+          await deApi.publishTelegram({
+            caption: item.captions.telegram_caption,
+            image_url: p.image_url || '',
+            affiliate_url: p.affiliate_url || '',
+            deal_id: res.deal_id,
+          });
+        }
+
+        done++;
+      } catch {}
+      setPublishProgress(Math.round((done / approved.length) * 100));
+    }
+    toast.success(`Published ${done} deals`);
+    setResults([]);
+    setUrlsText('');
+    setPublishing(false);
+    setPublishProgress(0);
+  };
+
+  return (
+    <div className="p-4 md:p-6 space-y-4" data-testid="de-queue-view">
+      <h3 className="font-bold text-sm">Deal Queue — Batch Processing</h3>
+      <p className="text-xs text-gray-500">Paste multiple product URLs (one per line). The engine will extract data and generate captions for all of them.</p>
+
+      {results.length === 0 ? (
+        <div className="space-y-3">
+          <textarea
+            value={urlsText}
+            onChange={e => setUrlsText(e.target.value)}
+            placeholder="https://www.amazon.in/dp/XXXXXXXXXX&#10;https://www.flipkart.com/product-name/p/...&#10;https://www.amazon.in/dp/YYYYYYYYYY"
+            className="w-full border rounded-xl p-3 text-sm min-h-[120px] bg-white resize-y focus:ring-2 focus:ring-[#ee922c]/30 outline-none font-mono"
+            data-testid="queue-urls-input"
+          />
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={handleProcessQueue}
+              disabled={processing}
+              className="bg-[#ee922c] hover:bg-[#d9811f] text-white"
+              data-testid="queue-process-btn"
+            >
+              {processing ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Rocket className="w-4 h-4 mr-1" />}
+              {processing ? 'Processing...' : `Process ${urlsText.split('\n').filter(u => u.trim().startsWith('http')).length} URLs`}
+            </Button>
+            <span className="text-[10px] text-gray-400">Max 15 URLs per batch</span>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {/* Progress bar during publish */}
+          {publishing && (
+            <div className="bg-orange-50 rounded-xl p-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-[#ee922c] mb-1">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                Publishing... {publishProgress}%
+              </div>
+              <div className="w-full bg-orange-200 rounded-full h-1.5">
+                <div className="bg-[#ee922c] h-1.5 rounded-full transition-all" style={{ width: `${publishProgress}%` }} />
+              </div>
+            </div>
+          )}
+
+          {/* Results list */}
+          <div className="space-y-2 max-h-[400px] overflow-y-auto" data-testid="queue-results">
+            {results.map((item, idx) => (
+              <div key={idx} className={`bg-white rounded-xl border p-3 flex items-start gap-3 ${!item.success ? 'opacity-50' : ''}`}>
+                <input
+                  type="checkbox"
+                  checked={item.approved}
+                  onChange={() => toggleApproval(idx)}
+                  className="mt-1 rounded"
+                  disabled={!item.success}
+                />
+                <div className="flex-1 min-w-0">
+                  {item.success ? (
+                    <>
+                      <p className="text-sm font-semibold truncate">{item.product?.title || 'Untitled'}</p>
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                        <span className="text-[10px] font-bold text-[#ee922c]">{item.product?.platform}</span>
+                        {item.product?.current_price > 0 && (
+                          <span className="text-[10px] font-bold text-[#3c7b48]">₹{item.product.current_price.toLocaleString()}</span>
+                        )}
+                        {item.product?.discount_pct > 0 && (
+                          <span className="text-[10px] bg-green-100 text-green-700 px-1 rounded">{item.product.discount_pct}% OFF</span>
+                        )}
+                        <span className="text-[10px] text-gray-400">{item.product?.extraction_method === 'ai' ? 'AI extracted' : 'Scraped'}</span>
+                      </div>
+                      {item.captions?.telegram_caption && (
+                        <p className="text-[10px] text-gray-400 mt-1 truncate">{item.captions.telegram_caption.slice(0, 80)}...</p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="text-xs text-red-500">{item.error || 'Failed'}: {item.url?.slice(0, 50)}</p>
+                  )}
+                </div>
+                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${item.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                  {item.success ? 'OK' : 'Fail'}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              onClick={() => handleBulkPublish(false)}
+              disabled={publishing || !results.some(r => r.approved)}
+              className="bg-[#3c7b48] hover:bg-[#2d6c3a] text-white"
+              data-testid="queue-publish-web"
+            >
+              <Globe className="w-4 h-4 mr-1" />
+              Publish to Website ({results.filter(r => r.approved && r.success).length})
+            </Button>
+            <Button
+              onClick={() => handleBulkPublish(true)}
+              disabled={publishing || !results.some(r => r.approved)}
+              variant="outline"
+              data-testid="queue-publish-all"
+            >
+              <Send className="w-4 h-4 mr-1" />
+              Publish + Telegram
+            </Button>
+            <Button variant="ghost" onClick={() => { setResults([]); setUrlsText(''); }} className="text-gray-500 ml-auto">
+              <RefreshCcw className="w-4 h-4 mr-1" /> Start Over
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
