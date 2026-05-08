@@ -53,6 +53,22 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
   - Category Form: Cloudinary image upload (drag/drop + URL fallback)
   - Blog Form: Cloudinary cover image upload
   - NOTE: Production site (disccart.in) needs EMERGENT_LLM_KEY set in Render environment variables
+- Phase 26: Deal Engine MVP (May 8, 2026)
+  - **New admin module**: Paste URL → Auto-extract → AI caption → Affiliate tag → Publish
+  - Backend: `/app/backend/deal_engine.py` — modular service for extraction, caption gen, affiliate tagging, Telegram
+  - Product extraction from Amazon India & Flipkart (graceful fallback on bot blocking)
+  - AI caption generation: Telegram-ready + website description + SEO title (GPT-4o via Emergent LLM)
+  - Affiliate link tagging: auto-append Amazon/Flipkart affiliate tags (configurable in settings)
+  - Telegram integration: send deal photo + caption + affiliate link to channel
+  - Website auto-publish: creates deal entry with slug, images, prices, affiliate link, AI description
+  - Deal status system: Draft / Scheduled / Published with admin filtering
+  - Analytics dashboard: total deals, telegram posts, published/draft/scheduled counts, top clicked
+  - Settings panel: Amazon affiliate tag, Flipkart affiliate ID, Telegram bot token & channel ID
+  - API endpoints: extract, caption, publish-telegram, publish-website, deals list, status update, analytics, settings
+  - Frontend: `AdminDealEngine.jsx` — 4-view component (Create/My Deals/Analytics/Settings)
+  - 4-step wizard: URL input → Preview & Edit → AI Captions → Done
+  - All fields editable before publishing
+  - Tested: Backend 100% (19/19), Frontend 100%
 
 ## Key API Endpoints
 - POST /api/auth/login, POST /api/auth/register, GET /api/auth/me

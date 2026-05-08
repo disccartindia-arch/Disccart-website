@@ -2077,13 +2077,18 @@ async def deal_engine_update_status(deal_id: str, request: Request):
     if new_status not in ["draft", "scheduled", "published"]:
         raise HTTPException(400, "Invalid status")
 
+    try:
+        oid = ObjectId(deal_id)
+    except Exception:
+        raise HTTPException(400, "Invalid deal ID")
+
     update = {"status": new_status}
     if new_status == "published":
         update["is_active"] = True
     elif new_status == "draft":
         update["is_active"] = False
 
-    await db.coupons.update_one({"_id": ObjectId(deal_id)}, {"$set": update})
+    await db.coupons.update_one({"_id": oid}, {"$set": update})
     cache.invalidate("coupons", "deals")
     return {"success": True}
 
@@ -2128,9 +2133,13 @@ async def deal_engine_settings(request: Request):
     await admin_required(request)
     settings = await db.site_settings.find_one({"_id": "deal_engine"}) or {}
     settings.pop("_id", None)
-    # Mask sensitive values
+    # Mask sensitive values — never return raw tokens
     if settings.get("telegram_bot_token"):
-        settings["telegram_bot_token_masked"] = settings["telegram_bot_token"][:8] + "..."
+        raw = settings["telegram_bot_token"]
+        settings["telegram_bot_token"] = raw[:8] + "..." + raw[-4:] if len(raw) > 12 else "***"
+        settings["telegram_configured"] = True
+    else:
+        settings["telegram_configured"] = False
     return settings
 
 

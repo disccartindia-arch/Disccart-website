@@ -614,7 +614,15 @@ function SettingsView() {
   useEffect(() => {
     deApi.getSettings()
       .then(data => {
-        setSettings(prev => ({ ...prev, ...data }));
+        setSettings(prev => ({
+          ...prev,
+          amazon_affiliate_tag: data.amazon_affiliate_tag || '',
+          flipkart_affiliate_id: data.flipkart_affiliate_id || '',
+          telegram_channel_id: data.telegram_channel_id || '',
+          // Don't overwrite token with masked value
+          telegram_bot_token: '',
+          telegram_configured: data.telegram_configured || false,
+        }));
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -623,7 +631,13 @@ function SettingsView() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await deApi.saveSettings(settings);
+      // Only send token if user typed a new one
+      const payload = { ...settings };
+      if (!payload.telegram_bot_token) {
+        delete payload.telegram_bot_token;
+      }
+      delete payload.telegram_configured;
+      await deApi.saveSettings(payload);
       toast.success('Settings saved');
     } catch {
       toast.error('Save failed');
@@ -658,8 +672,8 @@ function SettingsView() {
       <div className="bg-white rounded-xl border p-4 space-y-3">
         <h4 className="text-xs font-bold text-gray-500 uppercase">Telegram Integration</h4>
         <div>
-          <Label className="text-xs">Bot Token</Label>
-          <Input type="password" value={settings.telegram_bot_token} onChange={e => setSettings({...settings, telegram_bot_token: e.target.value})} placeholder="123456:ABC-DEF..." data-testid="de-tg-token" />
+          <Label className="text-xs">Bot Token {settings.telegram_configured && <span className="text-green-600 text-[10px]">(configured)</span>}</Label>
+          <Input type="password" value={settings.telegram_bot_token} onChange={e => setSettings({...settings, telegram_bot_token: e.target.value})} placeholder={settings.telegram_configured ? "Already set — enter new value to change" : "123456:ABC-DEF..."} data-testid="de-tg-token" />
         </div>
         <div>
           <Label className="text-xs">Channel ID</Label>
