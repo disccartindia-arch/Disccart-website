@@ -69,6 +69,16 @@ Build DISCCART - an AI-powered coupon and deals platform with React + FastAPI + 
   - 4-step wizard: URL input → Preview & Edit → AI Captions → Done
   - All fields editable before publishing
   - Tested: Backend 100% (19/19), Frontend 100%
+- Phase 26b: Deal Engine Stabilization + Deal Queue (May 8, 2026)
+  - FIXED: URL extraction now uses AI as primary fallback when Amazon/Flipkart blocks scraping
+  - FIXED: All API endpoints return proper error messages instead of 404/500
+  - FIXED: Settings save/load works correctly with masked Telegram token
+  - NEW: Deal Queue — paste multiple URLs, batch process with AI extraction + caption, approve/reject, bulk publish
+  - NEW: Telegram Test Connection button — validates bot token and channel access
+  - NEW: POST /api/deal-engine/queue (batch processing, max 15 URLs)
+  - NEW: POST /api/deal-engine/test-telegram (bot validation)
+  - AI extraction uses ASIN/slug from URL to identify product
+  - Tested: Backend 100% (31/31), Frontend 100%
 
 ## Key API Endpoints
 - POST /api/auth/login, POST /api/auth/register, GET /api/auth/me
