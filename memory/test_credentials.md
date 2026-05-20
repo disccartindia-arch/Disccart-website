@@ -2,10 +2,11 @@
 
 ## Admin Account
 - Email: disccartindia@gmail.com
-- Password: Admin@2026@
+- Password: admin@2026@
 - Role: admin
 
-## Test User Account
-- Email: testuser@test.com
-- Password: Test1234!
-- Role: user
+## Auth Endpoints
+- POST /api/auth/register
+- POST /api/auth/login
+- POST /api/auth/logout
+- GET /api/auth/me
